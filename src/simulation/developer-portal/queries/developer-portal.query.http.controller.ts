@@ -117,8 +117,12 @@ export class DeveloperPortalQueryHttpController {
   }
 
   @Get('developer-portal/assets/:assetName')
-  serveAsset(@Param('assetName') assetName: string, @Res() response: Response): void {
-    const contentType = DeveloperPortalQueryHttpController.ASSET_CONTENT_TYPES[assetName];
+  serveAsset(
+    @Param('assetName') assetName: string,
+    @Res() response: Response,
+  ): void {
+    const contentType =
+      DeveloperPortalQueryHttpController.ASSET_CONTENT_TYPES[assetName];
     const content = this.assets[assetName];
     if (!contentType || !content) throw new NotFoundException();
     response.setHeader('Content-Type', contentType);
@@ -138,34 +142,49 @@ export class DeveloperPortalQueryHttpController {
 
   @Get('developer-portal/api/internal/companies')
   async listAllCompanies() {
-    return { companies: await this.queryBus.execute(new ListInternalCompaniesQuery()) };
+    return {
+      companies: await this.queryBus.execute(new ListInternalCompaniesQuery()),
+    };
   }
 
   @Get('developer-portal/api/internal/messages')
   async listAllMessages() {
-    return { messages: await this.queryBus.execute(new ListInternalMessagesQuery()) };
+    return {
+      messages: await this.queryBus.execute(new ListInternalMessagesQuery()),
+    };
   }
 
   @Get('developer-portal/api/internal/identities')
   async listMockIdentities() {
-    return { identities: await this.queryBus.execute(new ListMockIdentitiesQuery()) };
+    return {
+      identities: await this.queryBus.execute(new ListMockIdentitiesQuery()),
+    };
   }
 
   @Get('developer-portal/api/internal/graph')
   async getInvoiceNetworkGraph(@Query('days') days?: string) {
-    const windowDays = Math.min(90, Math.max(1, Number.parseInt(days ?? '30', 10)));
-    return { graph: await this.queryBus.execute(new GetInvoiceNetworkGraphQuery(windowDays)) };
+    const windowDays = Math.min(
+      90,
+      Math.max(1, Number.parseInt(days ?? '30', 10)),
+    );
+    return {
+      graph: await this.queryBus.execute(
+        new GetInvoiceNetworkGraphQuery(windowDays),
+      ),
+    };
   }
 
   @Get('developer-portal/api/apps')
   async listApplications() {
     const apps = await this.queryBus.execute(new ListMockApplicationsQuery());
-    return { applications: apps.map(app => this.toApiModel(app)) };
+    return { applications: apps.map((app) => this.toApiModel(app)) };
   }
 
   @Get('developer-portal/api/apps/:clientId')
   async getApplication(@Param('clientId') clientId: string) {
-    const existing = await this.queryBus.execute(new GetMockApplicationQuery(clientId));
+    const existing = await this.queryBus.execute(
+      new GetMockApplicationQuery(clientId),
+    );
     if (!existing) throw new NotFoundException();
     return { application: this.toApiModel(existing) };
   }
@@ -184,10 +203,46 @@ export class DeveloperPortalQueryHttpController {
   private resolveAssetPath(assetName: string): string | undefined {
     const candidates = [
       join(__dirname, '..', '..', 'presentation', 'http', 'assets', assetName),
-      join(__dirname, '..', '..', '..', 'presentation', 'http', 'assets', assetName),
-      join(__dirname, '..', '..', '..', '..', 'simulation', 'presentation', 'http', 'assets', assetName),
-      join(process.cwd(), 'dist', 'simulation', 'presentation', 'http', 'assets', assetName),
-      join(process.cwd(), 'src', 'simulation', 'presentation', 'http', 'assets', assetName),
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'presentation',
+        'http',
+        'assets',
+        assetName,
+      ),
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '..',
+        'simulation',
+        'presentation',
+        'http',
+        'assets',
+        assetName,
+      ),
+      join(
+        process.cwd(),
+        'dist',
+        'simulation',
+        'presentation',
+        'http',
+        'assets',
+        assetName,
+      ),
+      join(
+        process.cwd(),
+        'src',
+        'simulation',
+        'presentation',
+        'http',
+        'assets',
+        assetName,
+      ),
       join(process.cwd(), 'assets', assetName),
     ];
     return candidates.find((candidate) => existsSync(candidate));
@@ -195,7 +250,10 @@ export class DeveloperPortalQueryHttpController {
 
   private loadAsset(assetName: string): string {
     const resolved = this.resolveAssetPath(assetName);
-    if (!resolved) throw new Error(`Required developer portal asset is missing: ${assetName}`);
+    if (!resolved)
+      throw new Error(
+        `Required developer portal asset is missing: ${assetName}`,
+      );
     return readFileSync(resolved, 'utf-8');
   }
 }

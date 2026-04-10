@@ -22,8 +22,7 @@ export interface ConsumedAuthorizationCodeGrant {
  */
 @Injectable()
 export class MockApplicationRegistryService implements OnModuleInit {
-  private static readonly APPS_STATE_KEY =
-    'anaf:mock:state:applications:v1';
+  private static readonly APPS_STATE_KEY = 'anaf:mock:state:applications:v1';
 
   private readonly logger = new Logger(MockApplicationRegistryService.name);
   private readonly applications = new Map<
@@ -390,7 +389,8 @@ export class MockApplicationRegistryService implements OnModuleInit {
         continue;
       }
 
-      const source: 'portal' | 'env' = candidate.source === 'env' ? 'env' : 'portal';
+      const source: 'portal' | 'env' =
+        candidate.source === 'env' ? 'env' : 'portal';
 
       const restored: SimulationTypes.RegisteredMockApplication = {
         clientId,

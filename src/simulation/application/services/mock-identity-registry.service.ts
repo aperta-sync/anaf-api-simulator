@@ -252,14 +252,14 @@ export class MockIdentityRegistryService implements OnModuleInit {
     if (domesticSet.has(sharedCui)) {
       changed =
         this.assignCui(
-        MockIdentityRegistryService.PRIMARY_IDENTITY_ID,
-        sharedCui,
-      ) || changed;
+          MockIdentityRegistryService.PRIMARY_IDENTITY_ID,
+          sharedCui,
+        ) || changed;
       changed =
         this.assignCui(
-        MockIdentityRegistryService.SECONDARY_IDENTITY_ID,
-        sharedCui,
-      ) || changed;
+          MockIdentityRegistryService.SECONDARY_IDENTITY_ID,
+          sharedCui,
+        ) || changed;
     }
 
     if (changed) {
@@ -291,9 +291,7 @@ export class MockIdentityRegistryService implements OnModuleInit {
     let changed = false;
 
     for (const profile of this.profiles.values()) {
-      const next = profile.authorizedCuis.filter((cui) =>
-        domesticSet.has(cui),
-      );
+      const next = profile.authorizedCuis.filter((cui) => domesticSet.has(cui));
       if (next.length !== profile.authorizedCuis.length) {
         changed = true;
       }
@@ -341,9 +339,10 @@ export class MockIdentityRegistryService implements OnModuleInit {
       return;
     }
 
-    const persisted = await this.controlStateStore.readJson<PersistedIdentityState>(
-      MockIdentityRegistryService.IDENTITY_STATE_KEY,
-    );
+    const persisted =
+      await this.controlStateStore.readJson<PersistedIdentityState>(
+        MockIdentityRegistryService.IDENTITY_STATE_KEY,
+      );
 
     if (!persisted || typeof persisted !== 'object') {
       return;

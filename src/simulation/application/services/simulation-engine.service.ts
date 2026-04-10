@@ -434,7 +434,9 @@ export class SimulationEngineService implements OnModuleInit {
    *
    * @param update Partial config values.
    */
-  private applyConfigUpdate(update: Partial<SimulationTypes.SimulationConfig>): void {
+  private applyConfigUpdate(
+    update: Partial<SimulationTypes.SimulationConfig>,
+  ): void {
     if (typeof update.latencyMs === 'number') {
       this.simulationConfig.latencyMs = Math.max(
         0,
@@ -733,7 +735,9 @@ export class SimulationEngineService implements OnModuleInit {
       city,
       county,
       address,
-      countryCode: String(candidate.countryCode ?? 'RO').trim().toUpperCase(),
+      countryCode: String(candidate.countryCode ?? 'RO')
+        .trim()
+        .toUpperCase(),
       vatPayer: candidate.vatPayer !== false,
     };
   }

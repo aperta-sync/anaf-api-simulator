@@ -113,9 +113,7 @@ export class DeveloperPortalCommandHttpController {
    */
   @Post('reset-defaults')
   async resetDefaults() {
-    const result = await this.commandBus.execute(
-      new ResetPortalStateCommand(),
-    );
+    const result = await this.commandBus.execute(new ResetPortalStateCommand());
 
     return {
       config: result.config,
