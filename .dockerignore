@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+portal-ui/node_modules
+portal-ui/dist
+test
+.history
+.git
+.DS_Store
+npm-debug.log
+yarn-error.log
+pnpm-debug.log

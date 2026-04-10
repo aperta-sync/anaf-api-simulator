@@ -40,4 +40,5 @@ lerna-debug.log*
 
 tsconfig.build.tsbuildinfo
 
-smart-accounting-firebase-service-account.json
+# Local history
+.history

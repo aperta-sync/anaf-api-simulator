@@ -7,7 +7,7 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "npm run build:ui && nest build",
-    "build:ui": "esbuild portal-ui/src/main.tsx --bundle --format=iife --target=es2020 --minify --define:process.env.NODE_ENV='\"production\"' --define:import.meta.env=\"{\\\"VITE_APP_VERSION\\\":\\\"0.1.0\\\"}\" --outfile=src/simulation/presentation/http/assets/console.js",
+    "build:ui": "npm --prefix portal-ui run build",
     "start": "nest start",
     "start:dev": "npm run build:ui && nest start --watch",
     "start:prod": "node dist/main",
@@ -66,8 +66,27 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.ts",
+      "!src/**/*.spec.ts",
+      "!src/**/*.d.ts",
+      "!src/main.ts",
+      "!src/index.ts",
+      "!src/simulation/presentation/http/assets/**"
     ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/",
+      "/coverage/",
+      "/portal-ui/"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 60,
+        "functions": 75,
+        "lines": 80,
+        "statements": 80
+      }
+    },
     "coverageDirectory": "./coverage",
     "testEnvironment": "node"
   }
