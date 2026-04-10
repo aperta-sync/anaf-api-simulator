@@ -1,122 +1,115 @@
-# ANAF API Simulation Engine
+# ANAF API Simulation Engine (Digital Twin)
 
-A NestJS-based simulator for building and testing integrations with Romanian ANAF APIs, including OAuth2, e-Factura, and VAT lookup workflows.
+A NestJS-based high-fidelity simulator for building and testing integrations with Romanian ANAF APIs, including OAuth2, e-Factura, and VAT lookup workflows.
 
 This service is designed for local development and CI environments where you want realistic API behavior without requiring a physical digital certificate, live ANAF credentials, or an actual ANAF developer account.
 
-## Introduction
+## Features
 
-The ANAF API Simulation Engine provides a high-fidelity digital twin of the key ANAF integration surfaces used by accounting and invoicing systems:
+- **Full OAuth2 Flow:** Authorization Code grant flow, Token exchange, and Refresh support.
+- **e-Factura Simulation:** Message list polling (`listaMesajeFactura`) and ZIP generation (`descarcare`) with valid UBL 2.1 XML.
+- **VAT Registry Simulation:** Mock VAT lookup (v9 standard) with deterministic company data.
+- **Developer Portal UI:** Built-in dashboard at `/console` for app registration and identity management.
+- **Fault Injection:** Configurable latency, random 500/504 errors, and 429 rate-limiting modes.
+- **Traffic Generation:** Background cron tasks to simulate active SPV inboxes.
+- **Flexible Storage:** In-memory state by default, or Redis-backed for persistent simulation across restarts.
 
-- OAuth2 authorization and token exchange
-- e-Factura message polling and ZIP download flow
-- Public VAT registry-style company lookup
-
-It also includes a built-in developer portal to self-register mock OAuth applications and generate credentials on demand.
-
-## Key Features
-
-- Full OAuth2 Flow
-  - Authorization Code grant flow
-  - Token exchange endpoint
-  - Refresh token support
-  - Strict client credential and redirect URI validation
-- e-Factura Simulation
-  - Message list polling via `listaMesajeFactura`
-  - Dynamic ZIP generation via `descarcare`
-  - ZIP payload includes valid UBL 2.1 invoice XML and signature file
-  - Identity-aware ownership firewall for CIF-scoped access checks
-- Public VAT Registry Simulation
-  - Mock VAT lookup for Romanian companies (v9 standard)
-  - Deterministic company metadata generation
-  - Strict lookup behavior with 404 `NOT_FOUND` response mode
-- Developer Portal UI
-  - Web dashboard for app registration
-  - Self-service `client_id` and `client_secret` generation
-  - Active application registry view
-  - Mock identity ownership matrix for e-sign and CIF authorization testing
-- Simulation Engine
-  - Deterministic seed presets (`anaf-core`, `anaf-large`) for repeatable datasets
-  - Optional synthetic runtime traffic generation (powered by background Cron)
-  - Legal Date Drift simulation (invoice issue date appears 1 to 5 days before upload date)
-  - Invoice network graph aggregation for inspector visualization
-- Fault Injection
-  - Configurable latency
-  - Configurable random 500/504 faults
-  - Configurable 429 rate-limit modes (deterministic and sliding-window)
-- Storage Options
-  - In-memory state store
-  - Redis-backed state store (with automatic memory fallback)
-
-## Replicated API Surface
-
-The server mirrors key ANAF path structures used in production integrations.
-
-| Capability             | Official ANAF Pattern                                     | Local Mock Equivalent                                      |
-| ---------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
-| OAuth2 Authorize       | `https://logincert.anaf.ro/anaf-oauth2/v1/authorize`      | `http://localhost:3003/anaf-oauth2/v1/authorize`           |
-| OAuth2 Token           | `https://logincert.anaf.ro/anaf-oauth2/v1/token`          | `http://localhost:3003/anaf-oauth2/v1/token`               |
-| e-Factura Message List | `https://api.anaf.ro/prod/FCTEL/rest/listaMesajeFactura`  | `http://localhost:3003/prod/FCTEL/rest/listaMesajeFactura` |
-| e-Factura Download     | `https://api.anaf.ro/prod/FCTEL/rest/descarcare`          | `http://localhost:3003/prod/FCTEL/rest/descarcare`         |
-| VAT Lookup (v9)        | `https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva` | `http://localhost:3003/api/PlatitorTvaRest/v9/tva`         |
+---
 
 ## Getting Started
 
-### Prerequisites
+### Local Development
 
-- Node.js 20+
-- npm or yarn
-- Optional: Redis (for persistent state mode)
+1. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
+2. **Run in Watch Mode:**
+   ```bash
+   npm run start:dev
+   ```
+   Open `http://localhost:3003/console` to manage the mock environment.
 
-### Environment Variables
+### Docker Usage
 
-| Variable                     | Default     | Required | Description                                                          |
-| ---------------------------- | ----------- | -------- | -------------------------------------------------------------------- |
-| `ANAF_MOCK_PORT`             | `3003`      | No       | HTTP port for the mock server                                        |
-| `ANAF_MOCK_STORE`            | `memory`    | No       | State backend: `memory` or `redis`                                   |
-| `ANAF_MOCK_BOOTSTRAP_CUIS`   | _(empty)_   | No       | Comma-separated Romanian CUIs seeded on startup (checksum-validated) |
-| `ANAF_MOCK_BOOTSTRAP_PRESET` | `anaf-core` | No       | Startup seed preset (`anaf-core`, `anaf-large`, or `none`)           |
-| `ANAF_CLIENT_ID`             | _(empty)_   | No       | Optional app bootstrap client ID for OAuth                           |
-| `ANAF_CLIENT_SECRET`         | _(empty)_   | No       | Optional app bootstrap client secret for OAuth                       |
-| `ANAF_CALLBACK_URL`          | _(empty)_   | No       | Optional redirect URI used with env-bootstrapped OAuth app           |
-| `REDIS_URL`                  | _(empty)_   | No       | Redis connection URL (used when `ANAF_MOCK_STORE=redis`)             |
-| `REDIS_HOST`                 | `127.0.0.1` | No       | Redis host fallback                                                  |
-| `REDIS_PORT`                 | `6379`      | No       | Redis port fallback                                                  |
+The project includes a multi-stage **lightweight Dockerfile** (Alpine-based) optimized for production.
 
-## Simulation Settings Reference
+1. **Build the image locally:**
+   ```bash
+   docker build -t anaf-mock-server:latest .
+   ```
+2. **Run with default settings:**
+   ```bash
+   docker run -p 3003:3003 anaf-mock-server:latest
+   ```
+3. **Run with custom Simulation Settings:**
+   ```bash
+   docker run -p 3003:3003 \
+     -e ANAF_MOCK_LATENCY_MS=500 \
+     -e ANAF_MOCK_ERROR_RATE=5 \
+     -e ANAF_MOCK_STRICT_OWNERSHIP=true \
+     anaf-mock-server:latest
+   ```
 
-You can configure these settings via the **Settings** tab in the Developer Console or the `PATCH /simulation/config` API.
+---
 
-| Setting                     | UI Label              | Description                                                                                                   |
-| :-------------------------- | :-------------------- | :------------------------------------------------------------------------------------------------------------ |
-| `latencyMs`                 | **Latency (ms)**      | Adds an artificial delay to every API response to test frontend loading states and timeouts.                  |
-| `errorRate`                 | **Fail Rate (%)**     | The probability (0-100) that a request will randomly fail with a `500 Server Error` or `504 Timeout`.         |
-| `trafficProbability`        | **Traffic Prob**      | The chance (0.0 to 1.0) that a background cron tick will generate new invoices for known companies.           |
-| `strictVatLookup`           | **Strict VAT Lookup** | When **ON**, the VAT API only finds companies that were explicitly seeded or bootstrapped.                    |
-| `strictOwnershipValidation` | **Strict Ownership**  | When **ON**, checking an inbox or downloading a ZIP requires an OAuth Token that "owns" the target CIF.       |
-| `autoGenerateTraffic`       | **Synthetic Traffic** | Enables background generation of random invoices every minute to simulate an active SPV inbox.                |
-| `rateLimitMode`             | **429 Throttle Mode** | Selects rate-limiting strategy: `off`, `deterministic` (every 5th request), or `windowed` (time-frame based). |
-| `rateLimitMaxRequests`      | **Max Requests**      | For `windowed` mode, maximum requests allowed per client during the configured time frame.                    |
-| `rateLimitWindowMs`         | **Window (seconds)**  | For `windowed` mode, time-frame length used for throttling decisions (stored as milliseconds in config).      |
-| `rateLimitTrigger`          | **Legacy 429 Toggle** | Backward-compatible boolean alias. When enabled without an explicit mode, defaults to deterministic behavior. |
+## Configuration Reference
+
+The server behavior is controlled by environment variables. These can be set in a `.env` file or passed directly to Docker.
+
+### Core Server Settings
+
+| Variable            | Default  | Description                              |
+| :------------------ | :------- | :--------------------------------------- |
+| `ANAF_MOCK_PORT`    | `3003`   | HTTP port the server listens on.         |
+| `ANAF_MOCK_STORE`   | `memory` | State backend: `memory` or `redis`.      |
+| `ANAF_MOCK_VERSION` | `0.1.0`  | Injected version string shown in the UI. |
+
+### Simulation Settings
+
+| Variable                     | Default | Description                                                                |
+| :--------------------------- | :------ | :------------------------------------------------------------------------- |
+| `ANAF_MOCK_LATENCY_MS`       | `200`   | Artificial delay (ms) for every API response.                              |
+| `ANAF_MOCK_ERROR_RATE`       | `0`     | Probability (0-100) of random 500/504 failures.                            |
+| `ANAF_MOCK_RATE_LIMIT_MODE`  | `off`   | Throttle strategy: `off`, `deterministic`, or `windowed`.                  |
+| `ANAF_MOCK_STRICT_OWNERSHIP` | `true`  | When enabled, OAuth tokens must "own" the target CIF to download invoices. |
+| `ANAF_MOCK_STRICT_VAT`       | `false` | When enabled, only explicitly seeded companies are found.                  |
+| `ANAF_MOCK_AUTO_TRAFFIC`     | `false` | Automatically generates random invoices every minute.                      |
+
+### Redis Settings (Required if store is `redis`)
+
+| Variable     | Default     | Description                                                  |
+| :----------- | :---------- | :----------------------------------------------------------- |
+| `REDIS_URL`  |             | Full connection string (e.g. `redis://user:pass@host:port`). |
+| `REDIS_HOST` | `127.0.0.1` | Fallback host if `REDIS_URL` is missing.                     |
+| `REDIS_PORT` | `6379`      | Fallback port if `REDIS_URL` is missing.                     |
+
+### Bootstrap & Seeding
+
+| Variable                     | Default     | Description                                                 |
+| :--------------------------- | :---------- | :---------------------------------------------------------- |
+| `ANAF_MOCK_BOOTSTRAP_PRESET` | `anaf-core` | Startup seed dataset: `anaf-core`, `anaf-large`, or `none`. |
+| `ANAF_MOCK_BOOTSTRAP_CUIS`   |             | Comma-separated Romanian CUIs to seed on startup.           |
+
+---
 
 ## Advanced Usage
 
-### Runtime Configuration
+### Runtime Configuration API
+
+You can change the simulation behavior on the fly without restarting:
 
 ```bash
 curl -X PATCH http://localhost:3003/simulation/config \
   -H "Content-Type: application/json" \
-  -d '{ "latencyMs": 500, "autoGenerateTraffic": true }'
+  -d '{ "latencyMs": 500, "errorRate": 10 }'
 ```
 
-### Inspector APIs (Internal)
+### Testing
 
-- `GET /developer-portal/api/internal/companies`: List all simulated company profiles.
-- `GET /developer-portal/api/internal/messages`: List all generated invoices globally.
-- `GET /developer-portal/api/internal/identities`: List all mock identities and their ownership mappings.
-- `GET /developer-portal/api/internal/graph?days=30`: Get directed traffic graph data.
+- **Unit Tests:** `npm run test`
+- **E2E Tests:** `npm run test:e2e` (Uses an in-memory server to verify full flows).
 
 ---
 
-_This simulator is intended for development and testing only._
+_This tool is intended for development and testing only._
