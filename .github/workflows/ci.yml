@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-build-docker:
+    name: Test, Build, Docker Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Install portal UI dependencies
+        run: npm --prefix portal-ui ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Build backend + UI assets
+        run: npm run build
+
+      - name: Build production Docker image
+        run: docker build --target runner -t anaf-mock-server:ci .
