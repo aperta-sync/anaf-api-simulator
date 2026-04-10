@@ -1,19 +1,22 @@
 # syntax=docker/dockerfile:1.7
 
+ARG NODE_ALPINE_IMAGE=node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
+ARG DISTROLESS_NODE_IMAGE=gcr.io/distroless/nodejs20-debian12:nonroot@sha256:2cd820156cf039c8b54ae2d2a97e424b6729070714de8707a6b79f20d56f6a9a
+
 # Stage 1: Root dependency install (cached)
-FROM node:20-alpine AS root-deps
+FROM ${NODE_ALPINE_IMAGE} AS root-deps
 WORKDIR /app
 COPY package*.json ./
 RUN --mount=type=cache,id=anaf-npm-root,target=/root/.npm npm ci
 
 # Stage 2: Portal UI dependency install (cached)
-FROM node:20-alpine AS portal-deps
+FROM ${NODE_ALPINE_IMAGE} AS portal-deps
 WORKDIR /app/portal-ui
 COPY portal-ui/package*.json ./
 RUN --mount=type=cache,id=anaf-npm-portal,target=/root/.npm npm ci
 
 # Stage 3: Build backend + UI assets
-FROM node:20-alpine AS builder
+FROM ${NODE_ALPINE_IMAGE} AS builder
 WORKDIR /app
 ARG VITE_APP_VERSION=0.1.0
 ENV VITE_APP_VERSION=${VITE_APP_VERSION}
@@ -23,13 +26,13 @@ COPY . .
 RUN npm run build
 
 # Stage 4: Production-only backend dependencies
-FROM node:20-alpine AS prod-deps
+FROM ${NODE_ALPINE_IMAGE} AS prod-deps
 WORKDIR /app
 COPY package*.json ./
 RUN --mount=type=cache,id=anaf-npm-prod,target=/root/.npm npm ci --omit=dev
 
 # Stage 5 (optional): Debug-friendly runtime with shell tooling
-FROM node:20-alpine AS runner-debug
+FROM ${NODE_ALPINE_IMAGE} AS runner-debug
 WORKDIR /app
 
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -47,7 +50,7 @@ EXPOSE 3003
 CMD ["node", "dist/main.js"]
 
 # Stage 6: Hardened minimal runtime image (default)
-FROM gcr.io/distroless/nodejs20-debian12:nonroot AS runner
+FROM ${DISTROLESS_NODE_IMAGE} AS runner
 WORKDIR /app
 
 COPY --from=prod-deps /app/node_modules ./node_modules
