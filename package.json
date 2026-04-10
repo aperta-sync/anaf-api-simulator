@@ -1,6 +1,6 @@
 {
   "name": "anaf-mock-server",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "ANAF API Simulation Engine - High-fidelity digital twin for Romanian ANAF APIs",
   "author": "Aperta Sync",
   "license": "MIT",
