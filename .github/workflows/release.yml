@@ -101,7 +101,7 @@ jobs:
           package-name: ${{ github.event.repository.name }}
           package-type: container
           min-versions-to-keep: 2
-          delete-only-untagged-versions: false
+          delete-only-untagged-versions: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub release
