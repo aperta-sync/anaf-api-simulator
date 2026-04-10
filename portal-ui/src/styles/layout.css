@@ -1,0 +1,66 @@
+.app-shell {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--surface-container-low);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--outline-variant);
+}
+
+.sidebar-brand {
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-icon {
+  background: linear-gradient(135deg, var(--primary), var(--primary-container));
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 3rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.view-pane {
+  display: none;
+}
+
+.view-pane.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  body,
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+
+  .main-content {
+    padding: 1.25rem;
+  }
+}

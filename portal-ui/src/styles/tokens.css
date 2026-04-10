@@ -1,0 +1,15 @@
+:root {
+  --surface: #f7f9fb;
+  --on-surface: #191c1e;
+  --surface-container-low: #f1f4f8;
+  --surface-container-lowest: #ffffff;
+  --surface-container-high: #ebeef3;
+  --surface-container-highest: #e1e2e8;
+  --primary: #000000;
+  --primary-container: #00174b;
+  --secondary: #515f74;
+  --secondary-container: #d5e3fc;
+  --surface-tint: #0053db;
+  --outline-variant: rgba(198, 198, 205, 0.15);
+  --sidebar-width: 280px;
+}

@@ -1,0 +1,74 @@
+{
+  "name": "anaf-mock-server",
+  "version": "0.1.0",
+  "description": "ANAF API Simulation Engine - High-fidelity digital twin for Romanian ANAF APIs",
+  "author": "Aperta Sync",
+  "license": "MIT",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "npm run build:ui && nest build",
+    "build:ui": "esbuild portal-ui/src/main.tsx --bundle --format=iife --target=es2020 --minify --define:process.env.NODE_ENV='\"production\"' --define:import.meta.env=\"{\\\"VITE_APP_VERSION\\\":\\\"0.1.0\\\"}\" --outfile=src/simulation/presentation/http/assets/console.js",
+    "start": "nest start",
+    "start:dev": "npm run build:ui && nest start --watch",
+    "start:prod": "node dist/main",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "jest --config test/jest-e2e.json",
+    "test:all": "npm run test && npm run test:e2e"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/cqrs": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/schedule": "^6.0.0",
+    "@nestjs/serve-static": "^5.0.0",
+    "adm-zip": "^0.5.17",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.3",
+    "fast-xml-parser": "^5.5.0",
+    "ioredis": "^5.4.1",
+    "nanoid": "^3.3.4",
+    "oxide.ts": "^1.1.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.2.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/adm-zip": "^0.5.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/supertest": "^7.2.0",
+    "esbuild": "^0.28.0",
+    "rimraf": "^3.0.2",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
+    "ts-loader": "^9.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": ".",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "./coverage",
+    "testEnvironment": "node"
+  }
+}
