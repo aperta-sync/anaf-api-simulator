@@ -14,6 +14,7 @@ import { FaultInjectorMiddleware } from './simulation/infrastructure/middleware/
 import { MockApplicationRegistryService } from './simulation/application/services/mock-application-registry.service';
 import { MockIdentityRegistryService } from './simulation/application/services/mock-identity-registry.service';
 import { OAuthTokenService } from './simulation/application/services/oauth-token.service';
+import { RedisControlStateStoreService } from './simulation/infrastructure/persistence/redis-control-state-store.service';
 import { RedisStatefulMessageStoreService } from './simulation/infrastructure/persistence/redis-stateful-message-store.service';
 import { SimulationEngineService } from './simulation/application/services/simulation-engine.service';
 import { StatefulMessageStoreService } from './simulation/infrastructure/persistence/stateful-message-store.service';
@@ -44,6 +45,7 @@ import { VatQueryHttpController } from './simulation/vat/queries/vat.query.http.
     MockApplicationRegistryService,
     MockIdentityRegistryService,
     OAuthTokenService,
+    RedisControlStateStoreService,
     SimulationEngineService,
     TrafficGeneratorService,
     StatefulMessageStoreService,

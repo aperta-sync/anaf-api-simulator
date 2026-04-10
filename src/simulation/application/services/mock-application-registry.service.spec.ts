@@ -184,14 +184,46 @@ describe('MockApplicationRegistryService', () => {
     expect(service.deleteApplication(app.clientId)).toBe(false);
   });
 
-  it('bootstraps one environment-defined client during module init', () => {
+  it('resets app registry to defaults and clears authorization grants', async () => {
     process.env.ANAF_CLIENT_ID = 'env-client';
     process.env.ANAF_CLIENT_SECRET = 'env-secret';
     process.env.ANAF_CALLBACK_URL = 'https://env/callback';
 
     const service = new MockApplicationRegistryService();
-    service.onModuleInit();
-    service.onModuleInit();
+    await service.onModuleInit();
+
+    const created = service.registerApplication('Portal App', [
+      'https://portal/callback',
+    ]);
+
+    const code = service.issueAuthorizationCode(
+      created.clientId,
+      'https://portal/callback',
+      'id_ion_popescu',
+    );
+
+    const resetApps = await service.resetToDefaults();
+
+    expect(resetApps).toHaveLength(1);
+    expect(resetApps[0].clientId).toBe('env-client');
+    expect(service.getApplication(created.clientId)).toBeUndefined();
+    expect(
+      service.consumeAuthorizationCode(
+        code,
+        created.clientId,
+        'https://portal/callback',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('bootstraps one environment-defined client during module init', async () => {
+    process.env.ANAF_CLIENT_ID = 'env-client';
+    process.env.ANAF_CLIENT_SECRET = 'env-secret';
+    process.env.ANAF_CALLBACK_URL = 'https://env/callback';
+
+    const service = new MockApplicationRegistryService();
+    await service.onModuleInit();
+    await service.onModuleInit();
 
     const app = service.getApplication('env-client');
     expect(app).toBeDefined();

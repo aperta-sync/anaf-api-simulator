@@ -61,8 +61,18 @@ export class UpdateMockIdentityOwnershipCommand {
   ) {}
 }
 
+/**
+ * Resets runtime portal-managed config and app data to startup defaults.
+ */
+export class ResetPortalStateCommand {}
+
 export type DeveloperPortalCommandResult =
   | SimulationTypes.RegisteredMockApplication
   | SimulationTypes.RegisteredMockApplication
   | SimulationTypes.IdentityProfile
+  | {
+      config: SimulationTypes.SimulationConfig;
+      requestCount: number;
+      applications: SimulationTypes.RegisteredMockApplication[];
+    }
   | boolean;

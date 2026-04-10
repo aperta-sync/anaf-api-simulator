@@ -14,6 +14,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { RegisterMockAppDto } from './register-mock-app.request.dto';
 import { UpdateMockAppDto } from './update-mock-app.request.dto';
 import {
+  ResetPortalStateCommand,
   RegisterMockApplicationCommand,
   RemoveMockApplicationCommand,
   UpdateMockApplicationCommand,
@@ -105,6 +106,22 @@ export class DeveloperPortalCommandHttpController {
         `Mock application ${clientId} was not found.`,
       );
     }
+  }
+
+  /**
+   * Resets portal-managed mutable state back to startup defaults.
+   */
+  @Post('reset-defaults')
+  async resetDefaults() {
+    const result = await this.commandBus.execute(
+      new ResetPortalStateCommand(),
+    );
+
+    return {
+      config: result.config,
+      requestCount: result.requestCount,
+      applications: result.applications.map((app) => this.toApiModel(app)),
+    };
   }
 
   /**

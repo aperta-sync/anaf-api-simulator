@@ -72,9 +72,9 @@ describe('SimulationEngineService', () => {
     expect(service.isValidRomanianCui('ROABCDEFGHI')).toBe(false);
   });
 
-  it('generates and caches unknown companies when strict lookup is disabled', () => {
+  it('generates and caches unknown companies when strict lookup is disabled', async () => {
     const service = buildService();
-    service.onModuleInit();
+    await service.onModuleInit();
 
     const first = service.getCompany('RO10395951');
     const second = service.getCompany('10395951');
@@ -84,17 +84,17 @@ describe('SimulationEngineService', () => {
     expect(second).toBe(first);
   });
 
-  it('returns undefined for unknown companies when strict lookup is enabled', () => {
+  it('returns undefined for unknown companies when strict lookup is enabled', async () => {
     const service = buildService();
-    service.onModuleInit();
+    await service.onModuleInit();
     service.updateConfig({ strictVatLookup: true });
 
     expect(service.getCompany('RO10395951')).toBeUndefined();
   });
 
-  it('throws when seeding a company with an invalid checksum', () => {
+  it('throws when seeding a company with an invalid checksum', async () => {
     const service = buildService();
-    service.onModuleInit();
+    await service.onModuleInit();
 
     expect(() =>
       service.seedCompany({
@@ -140,6 +140,31 @@ describe('SimulationEngineService', () => {
     expect(reenabled.rateLimitTrigger).toBe(true);
   });
 
+  it('resets runtime config and request counters to defaults', async () => {
+    const service = buildService();
+    await service.onModuleInit();
+
+    const baseline = service.getConfig();
+
+    service.updateConfig({
+      latencyMs: 999,
+      errorRate: 77,
+      rateLimitMode: 'windowed',
+      rateLimitWindowMs: 120_000,
+      rateLimitMaxRequests: 50,
+      trafficProbability: 0.9,
+      autoGenerateTraffic: true,
+      strictVatLookup: true,
+      strictOwnershipValidation: false,
+    });
+    service.incrementRequestCount();
+
+    const reset = service.resetConfigToDefaults();
+
+    expect(reset).toEqual(baseline);
+    expect(service.getRequestCount()).toBe(0);
+  });
+
   it('evaluates windowed rate limiting using a sliding time window', () => {
     const service = buildService();
     const nowSpy = jest.spyOn(Date, 'now');
@@ -173,9 +198,9 @@ describe('SimulationEngineService', () => {
     expect(seeded.some((company) => company.countryCode !== 'RO')).toBe(true);
   });
 
-  it('builds VAT records in ANAF-compatible format', () => {
+  it('builds VAT records in ANAF-compatible format', async () => {
     const service = buildService();
-    service.onModuleInit();
+    await service.onModuleInit();
 
     const company = service.getCompany('RO10000008');
     if (!company) {

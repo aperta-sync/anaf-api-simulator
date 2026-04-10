@@ -1,6 +1,12 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { SimulationTypes } from '../../domain/simulation.types';
 import { SimulationEngineService } from './simulation-engine.service';
+import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
+
+interface PersistedIdentityState {
+  manualOwnershipOverride: boolean;
+  profiles: SimulationTypes.IdentityProfile[];
+}
 
 interface IdentitySeedProfile {
   id: string;
@@ -13,6 +19,9 @@ interface IdentitySeedProfile {
  */
 @Injectable()
 export class MockIdentityRegistryService implements OnModuleInit {
+  private static readonly IDENTITY_STATE_KEY =
+    'anaf:mock:state:identity-ownership:v1';
+
   private static readonly IDENTITY_SEED: IdentitySeedProfile[] = [
     {
       id: 'id_ion_popescu',
@@ -54,15 +63,21 @@ export class MockIdentityRegistryService implements OnModuleInit {
   /**
    * Creates an instance of MockIdentityRegistryService.
    * @param simulationEngine Value for simulationEngine.
+   * @param controlStateStore Value for controlStateStore.
    */
-  constructor(private readonly simulationEngine: SimulationEngineService) {}
+  constructor(
+    private readonly simulationEngine: SimulationEngineService,
+    private readonly controlStateStore?: RedisControlStateStoreService,
+  ) {}
 
   /**
    * Seeds default mock identities and assigns CIF ownership on startup.
    */
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
+    await this.restoreIdentityState();
     this.seedProfiles();
     this.ensureCoverageForDomesticCompanies();
+    await this.persistIdentityState();
   }
 
   /**
@@ -162,6 +177,8 @@ export class MockIdentityRegistryService implements OnModuleInit {
 
     profile.authorizedCuis = normalized;
 
+    this.persistIdentityStateAsync();
+
     return {
       ...profile,
       authorizedCuis: [...profile.authorizedCuis],
@@ -186,17 +203,15 @@ export class MockIdentityRegistryService implements OnModuleInit {
    * Seeds static identity rows used by the mock ownership model.
    */
   private seedProfiles(): void {
-    if (this.profiles.size > 0) {
-      return;
-    }
-
     for (const seed of MockIdentityRegistryService.IDENTITY_SEED) {
-      this.profiles.set(seed.id, {
-        id: seed.id,
-        fullName: seed.fullName,
-        email: seed.email,
-        authorizedCuis: [],
-      });
+      if (!this.profiles.has(seed.id)) {
+        this.profiles.set(seed.id, {
+          id: seed.id,
+          fullName: seed.fullName,
+          email: seed.email,
+          authorizedCuis: [],
+        });
+      }
     }
   }
 
@@ -212,7 +227,7 @@ export class MockIdentityRegistryService implements OnModuleInit {
     const domesticCuis = this.collectDomesticCompanyCuis();
     const domesticSet = new Set(domesticCuis);
 
-    this.pruneUnknownAssignments(domesticSet);
+    let changed = this.pruneUnknownAssignments(domesticSet);
 
     const identityIds = [...this.profiles.keys()];
     if (identityIds.length === 0) {
@@ -226,7 +241,7 @@ export class MockIdentityRegistryService implements OnModuleInit {
       }
 
       const targetIdentity = identityIds[cursor % identityIds.length];
-      this.assignCui(targetIdentity, cui);
+      changed = this.assignCui(targetIdentity, cui) || changed;
       cursor += 1;
     }
 
@@ -235,14 +250,20 @@ export class MockIdentityRegistryService implements OnModuleInit {
     ).ro;
 
     if (domesticSet.has(sharedCui)) {
-      this.assignCui(
+      changed =
+        this.assignCui(
         MockIdentityRegistryService.PRIMARY_IDENTITY_ID,
         sharedCui,
-      );
-      this.assignCui(
+      ) || changed;
+      changed =
+        this.assignCui(
         MockIdentityRegistryService.SECONDARY_IDENTITY_ID,
         sharedCui,
-      );
+      ) || changed;
+    }
+
+    if (changed) {
+      this.persistIdentityStateAsync();
     }
   }
 
@@ -266,12 +287,20 @@ export class MockIdentityRegistryService implements OnModuleInit {
   /**
    * Removes assignments that are no longer part of domestic company ownership.
    */
-  private pruneUnknownAssignments(domesticSet: Set<string>): void {
+  private pruneUnknownAssignments(domesticSet: Set<string>): boolean {
+    let changed = false;
+
     for (const profile of this.profiles.values()) {
-      profile.authorizedCuis = profile.authorizedCuis.filter((cui) =>
+      const next = profile.authorizedCuis.filter((cui) =>
         domesticSet.has(cui),
       );
+      if (next.length !== profile.authorizedCuis.length) {
+        changed = true;
+      }
+      profile.authorizedCuis = next;
     }
+
+    return changed;
   }
 
   /**
@@ -290,14 +319,96 @@ export class MockIdentityRegistryService implements OnModuleInit {
   /**
    * Assigns one CUI to one identity without duplicates.
    */
-  private assignCui(identityId: string, cui: string): void {
+  private assignCui(identityId: string, cui: string): boolean {
     const profile = this.profiles.get(identityId);
     if (!profile) {
-      return;
+      return false;
     }
 
     if (!profile.authorizedCuis.includes(cui)) {
       profile.authorizedCuis.push(cui);
+      return true;
     }
+
+    return false;
+  }
+
+  /**
+   * Restores identity ownership state from control-state persistence.
+   */
+  private async restoreIdentityState(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    const persisted = await this.controlStateStore.readJson<PersistedIdentityState>(
+      MockIdentityRegistryService.IDENTITY_STATE_KEY,
+    );
+
+    if (!persisted || typeof persisted !== 'object') {
+      return;
+    }
+
+    this.manualOwnershipOverride = persisted.manualOwnershipOverride === true;
+
+    if (!Array.isArray(persisted.profiles)) {
+      return;
+    }
+
+    this.profiles.clear();
+    for (const candidate of persisted.profiles) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue;
+      }
+
+      const id = String(candidate.id ?? '').trim();
+      const fullName = String(candidate.fullName ?? '').trim();
+      const email = String(candidate.email ?? '').trim();
+      if (!id || !fullName || !email) {
+        continue;
+      }
+
+      const authorizedCuis = [
+        ...new Set(
+          (candidate.authorizedCuis ?? [])
+            .map((value) => this.simulationEngine.normalizeCui(value).ro)
+            .filter((value) => /^RO\d{2,10}$/.test(value)),
+        ),
+      ].sort((left, right) => left.localeCompare(right, 'ro'));
+
+      this.profiles.set(id, {
+        id,
+        fullName,
+        email,
+        authorizedCuis,
+      });
+    }
+  }
+
+  /**
+   * Persists identity ownership state without blocking request flow.
+   */
+  private persistIdentityStateAsync(): void {
+    void this.persistIdentityState();
+  }
+
+  /**
+   * Persists identity ownership state into Redis control-store.
+   */
+  private async persistIdentityState(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    await this.controlStateStore.writeJson<PersistedIdentityState>(
+      MockIdentityRegistryService.IDENTITY_STATE_KEY,
+      {
+        manualOwnershipOverride: this.manualOwnershipOverride,
+        profiles: [...this.profiles.values()].map((profile) => ({
+          ...profile,
+          authorizedCuis: [...profile.authorizedCuis],
+        })),
+      },
+    );
   }
 }

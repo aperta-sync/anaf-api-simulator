@@ -30,7 +30,7 @@ export function Sidebar({ view }: SidebarProps) {
             className="small text-muted font-monospace"
             style={{ fontSize: '9px', letterSpacing: '1px' }}
           >
-            MOCK CONSOLE v{version}
+            MOCK CONSOLE {version}
           </div>
         </div>
       </div>

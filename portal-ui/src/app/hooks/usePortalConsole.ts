@@ -391,6 +391,59 @@ export function usePortalConsole() {
   );
 
   /**
+   * Resets mutable portal state (config + app data) back to startup defaults.
+   */
+  const handleResetDefaults = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Reset configuration and app data to defaults? This will delete registered mock apps and clear active OAuth session tokens.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await apiRequest<{
+      config?: SimulationConfig;
+      requestCount?: number;
+      applications?: MockApplication[];
+    }>('/developer-portal/api/apps/reset-defaults', {
+      method: 'POST',
+    });
+
+    if (!result.ok) {
+      return;
+    }
+
+    if (result.data.config) {
+      const rawConfig = result.data.config as Partial<SimulationConfig>;
+      const resolvedMode =
+        rawConfig.rateLimitMode ||
+        (rawConfig.rateLimitTrigger ? 'deterministic' : 'off');
+
+      setConfigDraft({
+        ...DEFAULT_CONFIG,
+        ...rawConfig,
+        rateLimitMode: resolvedMode,
+        rateLimitTrigger: resolvedMode !== 'off',
+      });
+    }
+
+    if (typeof result.data.requestCount === 'number') {
+      setRequestCount(result.data.requestCount);
+    }
+
+    if (Array.isArray(result.data.applications)) {
+      setApps(result.data.applications);
+    }
+
+    handleClearTokens();
+    setCapturedCode('');
+
+    pushAlert('Config and app data reset to defaults.', 'success');
+    await refresh();
+  }, [apiRequest, handleClearTokens, pushAlert, refresh]);
+
+  /**
    * Loads one of the predefined simulation seed presets and refreshes aggregate
    * data panels.
    */
@@ -491,6 +544,7 @@ export function usePortalConsole() {
     handleListMessages,
     handleDownloadZip,
     handleSaveConfig,
+    handleResetDefaults,
     handleLoadSeedPreset,
     handleRefreshGraph,
     handleActivateApp,

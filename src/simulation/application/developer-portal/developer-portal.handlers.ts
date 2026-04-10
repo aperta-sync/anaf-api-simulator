@@ -14,6 +14,7 @@ import {
   ListMockApplicationsQuery,
 } from './developer-portal.queries';
 import {
+  ResetPortalStateCommand,
   RegisterMockApplicationCommand,
   RemoveMockApplicationCommand,
   UpdateMockIdentityOwnershipCommand,
@@ -138,6 +139,48 @@ export class UpdateMockIdentityOwnershipHandler implements ICommandHandler<
       command.identityId,
       command.authorizedCuis,
     );
+  }
+}
+
+/**
+ * Handles reset of portal-managed runtime state.
+ */
+@CommandHandler(ResetPortalStateCommand)
+@Injectable()
+export class ResetPortalStateHandler implements ICommandHandler<
+  ResetPortalStateCommand,
+  {
+    config: SimulationTypes.SimulationConfig;
+    requestCount: number;
+    applications: SimulationTypes.RegisteredMockApplication[];
+  }
+> {
+  /**
+   * Creates an instance of ResetPortalStateHandler.
+   * @param simulationEngine Value for simulationEngine.
+   * @param appRegistry Value for appRegistry.
+   */
+  constructor(
+    private readonly simulationEngine: SimulationEngineService,
+    private readonly appRegistry: MockApplicationRegistryService,
+  ) {}
+
+  /**
+   * Resets mutable config and app data to startup defaults.
+   */
+  async execute(): Promise<{
+    config: SimulationTypes.SimulationConfig;
+    requestCount: number;
+    applications: SimulationTypes.RegisteredMockApplication[];
+  }> {
+    const config = this.simulationEngine.resetConfigToDefaults();
+    const applications = await this.appRegistry.resetToDefaults();
+
+    return {
+      config,
+      requestCount: this.simulationEngine.getRequestCount(),
+      applications,
+    };
   }
 }
 
@@ -300,6 +343,7 @@ export const DEVELOPER_PORTAL_CQRS_HANDLERS = [
   UpdateMockApplicationHandler,
   RemoveMockApplicationHandler,
   UpdateMockIdentityOwnershipHandler,
+  ResetPortalStateHandler,
   ListInternalCompaniesHandler,
   ListInternalMessagesHandler,
   ListMockIdentitiesHandler,

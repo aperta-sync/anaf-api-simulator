@@ -50,26 +50,48 @@ export class DeveloperPortalQueryHttpController {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Authorization Successful</title>
+    <title>Authorization Result</title>
     <style>
-      body { font-family: sans-serif; display: grid; place-items: center; min-height: 100vh; background: #f8fafc; margin: 0; }
-      .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+      body { font-family: Inter, system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; background: #f8fafc; margin: 0; }
+      .card { background: white; padding: 2rem 2.25rem; border-radius: 1rem; box-shadow: 0 20px 32px -20px rgba(15,23,42,0.45); text-align: center; width: min(420px, 90vw); }
+      .icon { width: 56px; height: 56px; margin: 0 auto 1rem; border-radius: 999px; display: grid; place-items: center; font-size: 1.75rem; font-weight: 800; }
+      .icon.success { color: #047857; background: #d1fae5; }
+      .icon.error { color: #b91c1c; background: #fee2e2; }
+      h2 { margin: 0 0 0.5rem; font-size: 1.35rem; }
+      p { margin: 0; color: #475569; line-height: 1.45; }
     </style>
   </head>
   <body>
     <div class="card">
-      <h2>Success</h2>
-      <p>Authorization complete. This window will close automatically.</p>
+      <div id="result-icon" class="icon success" aria-hidden="true">✓</div>
+      <h2 id="result-title">Success</h2>
+      <p id="result-message">Authorization complete. This window will close automatically.</p>
     </div>
     <script>
       (function () {
         const params = new URLSearchParams(window.location.search);
+        const error = params.get('error');
+        const errorDescription = params.get('error_description');
+
+        const iconEl = document.getElementById('result-icon');
+        const titleEl = document.getElementById('result-title');
+        const messageEl = document.getElementById('result-message');
+
+        if (error && iconEl && titleEl && messageEl) {
+          iconEl.className = 'icon error';
+          iconEl.textContent = '✕';
+          titleEl.textContent = 'Authorization Failed';
+          messageEl.textContent = errorDescription || ('OAuth error: ' + error);
+        }
+
         const payload = {
           type: 'anaf-oauth-callback',
           code: params.get('code'),
           state: params.get('state'),
-          error: params.get('error'),
+          error: error,
+          error_description: errorDescription,
         };
+
         if (window.opener) {
           window.opener.postMessage(payload, window.location.origin);
           window.setTimeout(function () { window.close(); }, 1000);

@@ -8,7 +8,7 @@ const repoRoot = resolve(currentDir, '..', '..');
 const rootPackageJsonPath = resolve(repoRoot, 'package.json');
 
 const rootPackageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
-const fallbackVersion = String(rootPackageJson.version ?? '0.1.0');
+const fallbackVersion = String(rootPackageJson.version ?? 'v0.1.0');
 const requestedVersion = String(
   process.env.VITE_APP_VERSION?.trim() || fallbackVersion,
 );

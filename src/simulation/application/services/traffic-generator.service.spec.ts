@@ -63,14 +63,14 @@ describe('TrafficGeneratorService', () => {
   let messageStore: StatefulMessageStoreService;
   let service: TrafficGeneratorService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     restoreEnv();
     process.env.ANAF_MOCK_BOOTSTRAP_PRESET = 'none';
 
     simulationEngine = new SimulationEngineService(
       new RomanianCompanyNameGenerator(),
     );
-    simulationEngine.onModuleInit();
+    await simulationEngine.onModuleInit();
 
     messageStore = new StatefulMessageStoreService();
     service = new TrafficGeneratorService(simulationEngine, messageStore);
@@ -216,7 +216,7 @@ describe('TrafficGeneratorService', () => {
     const localEngine = new SimulationEngineService(
       new RomanianCompanyNameGenerator(),
     );
-    localEngine.onModuleInit();
+    await localEngine.onModuleInit();
 
     const localStore = new StatefulMessageStoreService();
     const localService = new TrafficGeneratorService(localEngine, localStore);

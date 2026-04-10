@@ -6,12 +6,22 @@ import {
 } from '@nestjs/common';
 import { RomanianCompanyNameGenerator } from './romanian-company-name.generator';
 import { SimulationTypes } from '../../domain/simulation.types';
+import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
+
+interface PersistedSimulationRuntimeState {
+  config?: Partial<SimulationTypes.SimulationConfig>;
+  registry?: SimulationTypes.CompanyProfile[];
+  generatedCompanies?: SimulationTypes.CompanyProfile[];
+}
 
 /**
  * Core simulation state manager for company registry, VAT behavior and runtime settings.
  */
 @Injectable()
 export class SimulationEngineService implements OnModuleInit {
+  private static readonly RUNTIME_STATE_KEY =
+    'anaf:mock:state:simulation-runtime:v1';
+
   private static readonly CORE_PRESET_COMPANIES: SimulationTypes.SeedCompanyRequest[] =
     [
       {
@@ -150,49 +160,37 @@ export class SimulationEngineService implements OnModuleInit {
   /**
    * Creates an instance of SimulationEngineService.
    * @param companyNameGenerator Value for companyNameGenerator.
+   * @param controlStateStore Value for controlStateStore.
    */
   constructor(
     private readonly companyNameGenerator: RomanianCompanyNameGenerator,
+    private readonly controlStateStore?: RedisControlStateStoreService,
   ) {
-    this.simulationConfig = {
-      latencyMs: Number(process.env.ANAF_MOCK_LATENCY_MS ?? 200),
-      errorRate: Number(process.env.ANAF_MOCK_ERROR_RATE ?? 0),
-      rateLimitMode: (process.env.ANAF_MOCK_RATE_LIMIT_MODE ?? 'off') as any,
-      rateLimitWindowMs: Number(
-        process.env.ANAF_MOCK_RATE_LIMIT_WINDOW_MS ?? 60_000,
-      ),
-      rateLimitMaxRequests: Number(
-        process.env.ANAF_MOCK_RATE_LIMIT_MAX_REQUESTS ?? 10,
-      ),
-      rateLimitTrigger:
-        (process.env.ANAF_MOCK_RATE_LIMIT_MODE ?? 'off') !== 'off',
-      trafficProbability: Number(
-        process.env.ANAF_MOCK_TRAFFIC_PROBABILITY ?? 0.35,
-      ),
-      autoGenerateTraffic:
-        (process.env.ANAF_MOCK_AUTO_TRAFFIC ?? 'false') === 'true',
-      strictVatLookup: (process.env.ANAF_MOCK_STRICT_VAT ?? 'false') === 'true',
-      strictOwnershipValidation:
-        (process.env.ANAF_MOCK_STRICT_OWNERSHIP ?? 'true') === 'true',
-    };
+    this.simulationConfig = this.buildDefaultConfig();
   }
 
   /**
    * Seeds bootstrap companies on module startup.
    */
-  onModuleInit(): void {
-    const bootstrapPreset = this.resolveBootstrapPreset();
-    if (bootstrapPreset) {
-      this.loadSeedPreset(bootstrapPreset);
-    }
+  async onModuleInit(): Promise<void> {
+    await this.restoreRuntimeState();
 
-    this.bootstrapCompaniesFromEnv();
+    if (!this.registry.size) {
+      const bootstrapPreset = this.resolveBootstrapPreset();
+      if (bootstrapPreset) {
+        this.loadSeedPreset(bootstrapPreset);
+      }
+
+      this.bootstrapCompaniesFromEnv();
+    }
 
     if (!this.registry.size) {
       for (const company of SimulationEngineService.CORE_PRESET_COMPANIES) {
-        this.seedCompany(company);
+        this.seedCompanyInternal(company, false);
       }
     }
+
+    await this.persistRuntimeState();
   }
 
   /**
@@ -275,6 +273,7 @@ export class SimulationEngineService implements OnModuleInit {
     const company = this.createGeneratedProfile(numeric, ro);
 
     this.generatedCompanies.set(numeric, company);
+    this.persistRuntimeStateAsync();
     return company;
   }
 
@@ -287,7 +286,11 @@ export class SimulationEngineService implements OnModuleInit {
   seedCompanies(
     companies: SimulationTypes.SeedCompanyRequest[],
   ): SimulationTypes.CompanyProfile[] {
-    return companies.map((company) => this.seedCompany(company));
+    const seeded = companies.map((company) =>
+      this.seedCompanyInternal(company, false),
+    );
+    this.persistRuntimeStateAsync();
+    return seeded;
   }
 
   /**
@@ -299,29 +302,7 @@ export class SimulationEngineService implements OnModuleInit {
   seedCompany(
     company: SimulationTypes.SeedCompanyRequest,
   ): SimulationTypes.CompanyProfile {
-    if (!this.isValidRomanianCui(company.cui)) {
-      throw new BadRequestException(
-        `Invalid Romanian CUI checksum: ${company.cui}`,
-      );
-    }
-
-    const normalized = this.normalizeCui(company.cui);
-
-    const seededProfile: SimulationTypes.CompanyProfile = {
-      cui: normalized.ro,
-      numericCui: normalized.numeric,
-      name: company.name,
-      city: company.city,
-      county: company.county,
-      address: company.address,
-      countryCode: (company.countryCode ?? 'RO').toUpperCase(),
-      vatPayer: company.vatPayer ?? true,
-    };
-
-    this.registry.set(normalized.numeric, seededProfile);
-    this.generatedCompanies.delete(normalized.numeric);
-
-    return seededProfile;
+    return this.seedCompanyInternal(company, true);
   }
 
   /**
@@ -430,6 +411,30 @@ export class SimulationEngineService implements OnModuleInit {
   updateConfig(
     update: Partial<SimulationTypes.SimulationConfig>,
   ): SimulationTypes.SimulationConfig {
+    this.applyConfigUpdate(update);
+    this.persistRuntimeStateAsync();
+    return this.getConfig();
+  }
+
+  /**
+   * Resets runtime simulation config and counters to startup defaults.
+   *
+   * @returns Updated simulation configuration.
+   */
+  resetConfigToDefaults(): SimulationTypes.SimulationConfig {
+    this.simulationConfig = this.buildDefaultConfig();
+    this.requestCount = 0;
+    this.rateLimitWindows.clear();
+    this.persistRuntimeStateAsync();
+    return this.getConfig();
+  }
+
+  /**
+   * Applies validated config values onto the in-memory runtime config.
+   *
+   * @param update Partial config values.
+   */
+  private applyConfigUpdate(update: Partial<SimulationTypes.SimulationConfig>): void {
     if (typeof update.latencyMs === 'number') {
       this.simulationConfig.latencyMs = Math.max(
         0,
@@ -487,8 +492,35 @@ export class SimulationEngineService implements OnModuleInit {
 
     this.simulationConfig.rateLimitTrigger =
       this.simulationConfig.rateLimitMode !== 'off';
+  }
 
-    return this.getConfig();
+  /**
+   * Builds startup-default simulation configuration from environment values.
+   *
+   * @returns Environment-resolved simulation defaults.
+   */
+  private buildDefaultConfig(): SimulationTypes.SimulationConfig {
+    return {
+      latencyMs: Number(process.env.ANAF_MOCK_LATENCY_MS ?? 200),
+      errorRate: Number(process.env.ANAF_MOCK_ERROR_RATE ?? 0),
+      rateLimitMode: (process.env.ANAF_MOCK_RATE_LIMIT_MODE ?? 'off') as any,
+      rateLimitWindowMs: Number(
+        process.env.ANAF_MOCK_RATE_LIMIT_WINDOW_MS ?? 60_000,
+      ),
+      rateLimitMaxRequests: Number(
+        process.env.ANAF_MOCK_RATE_LIMIT_MAX_REQUESTS ?? 10,
+      ),
+      rateLimitTrigger:
+        (process.env.ANAF_MOCK_RATE_LIMIT_MODE ?? 'off') !== 'off',
+      trafficProbability: Number(
+        process.env.ANAF_MOCK_TRAFFIC_PROBABILITY ?? 0.35,
+      ),
+      autoGenerateTraffic:
+        (process.env.ANAF_MOCK_AUTO_TRAFFIC ?? 'false') === 'true',
+      strictVatLookup: (process.env.ANAF_MOCK_STRICT_VAT ?? 'false') === 'true',
+      strictOwnershipValidation:
+        (process.env.ANAF_MOCK_STRICT_OWNERSHIP ?? 'true') === 'true',
+    };
   }
 
   /**
@@ -582,7 +614,128 @@ export class SimulationEngineService implements OnModuleInit {
       this.logger.log(
         `Bootstrapped ${seeded.length} CUI profiles from ANAF_MOCK_BOOTSTRAP_CUIS`,
       );
+      this.persistRuntimeStateAsync();
     }
+  }
+
+  /**
+   * Restores simulation runtime state from control-state persistence.
+   */
+  private async restoreRuntimeState(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    const persisted =
+      await this.controlStateStore.readJson<PersistedSimulationRuntimeState>(
+        SimulationEngineService.RUNTIME_STATE_KEY,
+      );
+
+    if (!persisted || typeof persisted !== 'object') {
+      return;
+    }
+
+    if (persisted.config && typeof persisted.config === 'object') {
+      this.applyConfigUpdate(persisted.config);
+    }
+
+    if (Array.isArray(persisted.registry)) {
+      this.registry.clear();
+      for (const candidate of persisted.registry) {
+        const profile = this.hydrateCompanyProfile(candidate);
+        if (!profile) {
+          continue;
+        }
+
+        this.registry.set(profile.numericCui, profile);
+      }
+    }
+
+    if (Array.isArray(persisted.generatedCompanies)) {
+      this.generatedCompanies.clear();
+      for (const candidate of persisted.generatedCompanies) {
+        const profile = this.hydrateCompanyProfile(candidate);
+        if (!profile) {
+          continue;
+        }
+
+        this.generatedCompanies.set(profile.numericCui, profile);
+      }
+    }
+
+    if (this.registry.size > 0 || this.generatedCompanies.size > 0) {
+      this.logger.log(
+        `Restored simulation runtime state from Redis (${this.registry.size} seeded, ${this.generatedCompanies.size} generated companies).`,
+      );
+    }
+  }
+
+  /**
+   * Persists runtime state without blocking request flow.
+   */
+  private persistRuntimeStateAsync(): void {
+    void this.persistRuntimeState();
+  }
+
+  /**
+   * Persists simulation runtime state to Redis control-store.
+   */
+  private async persistRuntimeState(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    const payload: PersistedSimulationRuntimeState = {
+      config: this.getConfig(),
+      registry: [...this.registry.values()],
+      generatedCompanies: [...this.generatedCompanies.values()],
+    };
+
+    await this.controlStateStore.writeJson(
+      SimulationEngineService.RUNTIME_STATE_KEY,
+      payload,
+    );
+  }
+
+  /**
+   * Hydrates a stored company profile after basic validation.
+   *
+   * @param input Raw persisted value.
+   * @returns Normalized company profile or undefined when invalid.
+   */
+  private hydrateCompanyProfile(
+    input: unknown,
+  ): SimulationTypes.CompanyProfile | undefined {
+    if (!input || typeof input !== 'object') {
+      return undefined;
+    }
+
+    const candidate = input as Partial<SimulationTypes.CompanyProfile>;
+    const rawCui = String(candidate.cui ?? '').trim();
+    if (!this.isValidRomanianCui(rawCui)) {
+      return undefined;
+    }
+
+    const normalized = this.normalizeCui(rawCui);
+    const name = String(candidate.name ?? '').trim();
+    const city = String(candidate.city ?? '').trim();
+    const county = String(candidate.county ?? '').trim();
+    const address = String(candidate.address ?? '').trim();
+
+    if (!name || !city || !county || !address) {
+      return undefined;
+    }
+
+    return {
+      cui: normalized.ro,
+      numericCui: normalized.numeric,
+      name,
+      city,
+      county,
+      address,
+      countryCode: String(candidate.countryCode ?? 'RO').trim().toUpperCase(),
+      vatPayer: candidate.vatPayer !== false,
+    };
   }
 
   /**
@@ -635,12 +788,63 @@ export class SimulationEngineService implements OnModuleInit {
       return existing;
     }
 
-    const profile = this.createGeneratedProfile(
+    const generated = this.createGeneratedProfile(
       normalized.numeric,
       normalized.ro,
     );
-    this.registry.set(normalized.numeric, profile);
-    return profile;
+
+    return this.seedCompanyInternal(
+      {
+        cui: generated.cui,
+        name: generated.name,
+        city: generated.city,
+        county: generated.county,
+        address: generated.address,
+        countryCode: generated.countryCode,
+        vatPayer: generated.vatPayer,
+      },
+      false,
+    );
+  }
+
+  /**
+   * Seeds one company profile into the registry with optional persistence.
+   *
+   * @param company Company seed payload.
+   * @param persist Whether to persist runtime state after mutation.
+   * @returns Persisted company profile.
+   */
+  private seedCompanyInternal(
+    company: SimulationTypes.SeedCompanyRequest,
+    persist: boolean,
+  ): SimulationTypes.CompanyProfile {
+    if (!this.isValidRomanianCui(company.cui)) {
+      throw new BadRequestException(
+        `Invalid Romanian CUI checksum: ${company.cui}`,
+      );
+    }
+
+    const normalized = this.normalizeCui(company.cui);
+
+    const seededProfile: SimulationTypes.CompanyProfile = {
+      cui: normalized.ro,
+      numericCui: normalized.numeric,
+      name: company.name,
+      city: company.city,
+      county: company.county,
+      address: company.address,
+      countryCode: (company.countryCode ?? 'RO').toUpperCase(),
+      vatPayer: company.vatPayer ?? true,
+    };
+
+    this.registry.set(normalized.numeric, seededProfile);
+    this.generatedCompanies.delete(normalized.numeric);
+
+    if (persist) {
+      this.persistRuntimeStateAsync();
+    }
+
+    return seededProfile;
   }
 
   /**

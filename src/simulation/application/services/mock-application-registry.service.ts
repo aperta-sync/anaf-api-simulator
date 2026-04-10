@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { SimulationTypes } from '../../domain/simulation.types';
+import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
 
 interface AuthorizationCodeGrant {
   code: string;
@@ -21,6 +22,9 @@ export interface ConsumedAuthorizationCodeGrant {
  */
 @Injectable()
 export class MockApplicationRegistryService implements OnModuleInit {
+  private static readonly APPS_STATE_KEY =
+    'anaf:mock:state:applications:v1';
+
   private readonly logger = new Logger(MockApplicationRegistryService.name);
   private readonly applications = new Map<
     string,
@@ -34,8 +38,20 @@ export class MockApplicationRegistryService implements OnModuleInit {
   /**
    * Seeds an environment-defined OAuth client at startup when configured.
    */
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
+    await this.restorePersistedApplications();
     this.bootstrapFromEnv();
+    await this.persistApplications();
+  }
+
+  /**
+   * Creates an instance of MockApplicationRegistryService.
+   * @param controlStateStore Value for controlStateStore.
+   */
+  constructor(
+    private readonly controlStateStore?: RedisControlStateStoreService,
+  ) {
+    // Nest manages lifecycle for injected services.
   }
 
   /**
@@ -64,6 +80,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
     };
 
     this.applications.set(clientId, app);
+    this.persistApplicationsAsync();
     return app;
   }
 
@@ -92,6 +109,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
     };
 
     this.applications.set(app.clientId, app);
+    this.persistApplicationsAsync();
     return app;
   }
 
@@ -171,6 +189,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
     };
 
     this.applications.set(key, updated);
+    this.persistApplicationsAsync();
     return updated;
   }
 
@@ -181,7 +200,27 @@ export class MockApplicationRegistryService implements OnModuleInit {
    * @returns True when an application was removed.
    */
   deleteApplication(clientId: string): boolean {
-    return this.applications.delete(clientId.trim());
+    const deleted = this.applications.delete(clientId.trim());
+    if (deleted) {
+      this.persistApplicationsAsync();
+    }
+
+    return deleted;
+  }
+
+  /**
+   * Resets application registry to startup defaults.
+   *
+   * @returns Restored applications after reset/bootstrapping.
+   */
+  async resetToDefaults(): Promise<
+    SimulationTypes.RegisteredMockApplication[]
+  > {
+    this.applications.clear();
+    this.authorizationCodes.clear();
+    this.bootstrapFromEnv();
+    await this.persistApplications();
+    return this.listApplicationsWithSecrets();
   }
 
   /**
@@ -318,6 +357,82 @@ export class MockApplicationRegistryService implements OnModuleInit {
 
     this.logger.log(
       `Bootstrapped ANAF OAuth client from environment: ${envClientId}`,
+    );
+  }
+
+  /**
+   * Restores registered applications from persisted control state.
+   */
+  private async restorePersistedApplications(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    const persisted = await this.controlStateStore.readJson<
+      SimulationTypes.RegisteredMockApplication[]
+    >(MockApplicationRegistryService.APPS_STATE_KEY);
+
+    if (!Array.isArray(persisted) || persisted.length === 0) {
+      return;
+    }
+
+    for (const candidate of persisted) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue;
+      }
+
+      const clientId = String(candidate.clientId ?? '').trim();
+      const clientSecret = String(candidate.clientSecret ?? '').trim();
+      const applicationName = String(candidate.applicationName ?? '').trim();
+      const createdAt = String(candidate.createdAt ?? '').trim();
+
+      if (!clientId || !clientSecret || !applicationName || !createdAt) {
+        continue;
+      }
+
+      const source: 'portal' | 'env' = candidate.source === 'env' ? 'env' : 'portal';
+
+      const restored: SimulationTypes.RegisteredMockApplication = {
+        clientId,
+        clientSecret,
+        applicationName,
+        createdAt,
+        source,
+        redirectUris: this.sanitizeRedirectUris(candidate.redirectUris ?? []),
+      };
+
+      if (restored.redirectUris.length === 0) {
+        continue;
+      }
+
+      this.applications.set(restored.clientId, restored);
+    }
+
+    if (this.applications.size > 0) {
+      this.logger.log(
+        `Loaded ${this.applications.size} persisted mock OAuth applications.`,
+      );
+    }
+  }
+
+  /**
+   * Persists application registry state without blocking request flow.
+   */
+  private persistApplicationsAsync(): void {
+    void this.persistApplications();
+  }
+
+  /**
+   * Persists application registry state to control-state store.
+   */
+  private async persistApplications(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    await this.controlStateStore.writeJson(
+      MockApplicationRegistryService.APPS_STATE_KEY,
+      this.listApplicationsWithSecrets(),
     );
   }
 

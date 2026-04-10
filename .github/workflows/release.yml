@@ -81,6 +81,7 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=tag
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -92,6 +93,15 @@ jobs:
             VITE_APP_VERSION=${{ steps.version.outputs.raw }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Prune old GHCR container versions (keep latest only)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 1
+          delete-only-untagged-versions: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

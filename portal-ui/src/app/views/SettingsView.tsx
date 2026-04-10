@@ -15,6 +15,7 @@ interface SettingsViewProps {
     updater: (current: SimulationConfig) => SimulationConfig,
   ) => void;
   handleSaveConfig: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  handleResetDefaults: () => Promise<void>;
 }
 
 /**
@@ -27,6 +28,7 @@ export function SettingsView({
   configDraft,
   setConfigDraft,
   handleSaveConfig,
+  handleResetDefaults,
 }: SettingsViewProps) {
   const updateRateLimitMode = (mode: RateLimitMode) => {
     setConfigDraft((current) => ({
@@ -233,6 +235,22 @@ export function SettingsView({
           <UiButton type="submit" className="mt-4 px-5">
             Save Config
           </UiButton>
+
+          <div className="mt-4 pt-4 border-top">
+            <div className="small fw-bold text-uppercase text-muted mb-2">
+              Danger Zone
+            </div>
+            <p className="small text-muted mb-3">
+              Reset runtime configuration and mock app data to startup defaults.
+            </p>
+            <UiButton
+              type="button"
+              variant="link-danger"
+              onClick={() => void handleResetDefaults()}
+            >
+              Reset Config + App Data
+            </UiButton>
+          </div>
         </form>
       </UiCard>
     </div>

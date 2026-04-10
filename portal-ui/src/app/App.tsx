@@ -76,6 +76,7 @@ export function App() {
     handleListMessages,
     handleDownloadZip,
     handleSaveConfig,
+    handleResetDefaults,
     handleLoadSeedPreset,
     handleRefreshGraph,
     handleActivateApp,
@@ -212,6 +213,7 @@ export function App() {
                 configDraft={configDraft}
                 setConfigDraft={setConfigDraft}
                 handleSaveConfig={handleSaveConfig}
+                handleResetDefaults={handleResetDefaults}
               />
             }
           />
