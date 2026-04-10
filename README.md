@@ -112,4 +112,16 @@ curl -X PATCH http://localhost:3003/simulation/config \
 
 ---
 
+## Contributing
+
+We welcome contributions from the community to make this simulator more robust! To maintain stability, our `master` branch is protected. Please follow this standard workflow:
+
+1. **Open an Issue:** Before writing code, please open an issue using our **Bug Report** or **Feature Request** templates to discuss your proposed changes.
+2. **Create a Branch:** Check out a new feature branch from `master` (e.g., `git checkout -b feat/new-spv-endpoint`).
+3. **Commit & Push:** Make your changes and push them to your branch. Ensure your code passes all linting and local tests (`npm run test`).
+4. **Open a Pull Request:** Submit a PR against the `master` branch using the provided PR template.
+5. **CI/CD Validation:** Our automated CI pipeline will trigger to run tests and validate the Docker build. The CI status must be **green** before a maintainer can review and merge your PR.
+
+---
+
 _This tool is intended for development and testing only._
