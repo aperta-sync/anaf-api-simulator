@@ -25,9 +25,13 @@ import { ZipArchiveService } from './simulation/application/services/zip-archive
 import { RomanianCompanyNameGenerator } from './simulation/application/services/romanian-company-name.generator';
 import { SIMULATION_CQRS_HANDLERS } from './simulation/application/cqrs.handlers';
 import { DeveloperPortalQueryHttpController } from './simulation/developer-portal/queries/developer-portal.query.http.controller';
+import { MessagesCommandHttpController } from './simulation/messages/commands/messages.command.http.controller';
 import { MessagesQueryHttpController } from './simulation/messages/queries/messages.query.http.controller';
 import { SimulationQueryHttpController } from './simulation/simulation/queries/simulation.query.http.controller';
 import { VatQueryHttpController } from './simulation/vat/queries/vat.query.http.controller';
+import { UPLOAD_TRACKING_STORE } from './simulation/application/ports/upload-tracking-store.port';
+import { UploadTrackingStoreService } from './simulation/infrastructure/persistence/upload-tracking-store.service';
+import { RedisUploadTrackingStoreService } from './simulation/infrastructure/persistence/redis-upload-tracking-store.service';
 
 @Module({
   imports: [CqrsModule, ScheduleModule.forRoot()],
@@ -36,6 +40,7 @@ import { VatQueryHttpController } from './simulation/vat/queries/vat.query.http.
     DeveloperPortalIdentityCommandHttpController,
     OAuthCommandHttpController,
     SimulationCommandHttpController,
+    MessagesCommandHttpController,
     DeveloperPortalQueryHttpController,
     MessagesQueryHttpController,
     SimulationQueryHttpController,
@@ -60,6 +65,19 @@ import { VatQueryHttpController } from './simulation/vat/queries/vat.query.http.
         return mode === 'redis' ? redisStore : inMemoryStore;
       },
       inject: [StatefulMessageStoreService, RedisStatefulMessageStoreService],
+    },
+    UploadTrackingStoreService,
+    RedisUploadTrackingStoreService,
+    {
+      provide: UPLOAD_TRACKING_STORE,
+      useFactory: (
+        inMemoryStore: UploadTrackingStoreService,
+        redisStore: RedisUploadTrackingStoreService,
+      ) => {
+        const mode = (process.env.ANAF_MOCK_STORE ?? 'memory').toLowerCase();
+        return mode === 'redis' ? redisStore : inMemoryStore;
+      },
+      inject: [UploadTrackingStoreService, RedisUploadTrackingStoreService],
     },
     UblGeneratorService,
     ZipArchiveService,
