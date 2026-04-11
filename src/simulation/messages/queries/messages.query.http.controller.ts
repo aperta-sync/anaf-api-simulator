@@ -103,7 +103,7 @@ export class MessagesQueryHttpController {
       });
     }
 
-    this.assertOwnershipAccess(auth, archiveResult.message.cif_beneficiar);
+    this.assertDownloadAccess(auth, archiveResult.message);
 
     response.setHeader('Content-Type', 'application/zip');
     response.setHeader(
@@ -245,6 +245,48 @@ export class MessagesQueryHttpController {
         default: return char;
       }
     });
+  }
+
+  /**
+   * Enforces download access: user must own either the beneficiary or emitter CIF.
+   */
+  private assertDownloadAccess(
+    auth: AccessTokenValidationResult,
+    message: SimulationTypes.StoredInvoiceMessage,
+  ): void {
+    const strictMode =
+      this.simulationEngine.getConfig().strictOwnershipValidation;
+    if (!strictMode) {
+      return;
+    }
+
+    const identityId = auth.identityId?.trim();
+    if (!identityId) {
+      const normalizedCif = this.simulationEngine.normalizeCui(message.cif_beneficiar).ro;
+      throw new ForbiddenException({
+        error: 'access_denied',
+        error_description: `User is not authorized to access data for CIF ${normalizedCif}.`,
+      });
+    }
+
+    const beneficiaryCif = this.simulationEngine.normalizeCui(message.cif_beneficiar).ro;
+    const emitterCif = this.simulationEngine.normalizeCui(message.cif_emitent).ro;
+
+    const authorizedForBeneficiary = this.identityRegistry.isIdentityAuthorizedForCui(
+      identityId,
+      beneficiaryCif,
+    );
+    const authorizedForEmitter = this.identityRegistry.isIdentityAuthorizedForCui(
+      identityId,
+      emitterCif,
+    );
+
+    if (!authorizedForBeneficiary && !authorizedForEmitter) {
+      throw new ForbiddenException({
+        error: 'access_denied',
+        error_description: `User is not authorized to access data for CIF ${beneficiaryCif}.`,
+      });
+    }
   }
 
   /**
