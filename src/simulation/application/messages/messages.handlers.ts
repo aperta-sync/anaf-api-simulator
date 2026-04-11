@@ -6,6 +6,7 @@ import { SimulationTypes } from '../../domain/simulation.types';
 import {
   EfacturaArchiveResult,
   GetEfacturaArchiveQuery,
+  GetUploadStatusQuery,
   ListEfacturaMessagesQuery,
 } from './messages.queries';
 import {
@@ -173,8 +174,90 @@ export class UploadEfacturaInvoiceHandler implements ICommandHandler<
   }
 }
 
+/**
+ * Result of a stareMesaj query.
+ */
+export interface UploadStatusResult {
+  stare: SimulationTypes.UploadStatus;
+  idDescarcare: string | null;
+  errors: string[];
+}
+
+/**
+ * Handles upload status queries with lazy processing completion.
+ */
+@QueryHandler(GetUploadStatusQuery)
+@Injectable()
+export class GetUploadStatusHandler implements IQueryHandler<
+  GetUploadStatusQuery,
+  UploadStatusResult | undefined
+> {
+  constructor(
+    @Inject(UPLOAD_TRACKING_STORE)
+    private readonly uploadStore: UploadTrackingStorePort,
+    private readonly trafficGenerator: TrafficGeneratorService,
+    private readonly simulationEngine: SimulationEngineService,
+  ) {}
+
+  async execute(
+    query: GetUploadStatusQuery,
+  ): Promise<UploadStatusResult | undefined> {
+    const record = await this.uploadStore.findByUploadIndex(
+      query.idIncarcare,
+    );
+
+    if (!record) {
+      return undefined;
+    }
+
+    if (
+      record.status === 'in prelucrare' &&
+      Date.now() >= record.processingCompleteAt.getTime()
+    ) {
+      await this.completeProcessing(record);
+    }
+
+    return {
+      stare: record.status,
+      idDescarcare: record.messageId,
+      errors: record.errors,
+    };
+  }
+
+  private async completeProcessing(
+    record: SimulationTypes.UploadedInvoiceRecord,
+  ): Promise<void> {
+    const supplierProfile = this.simulationEngine.getCompany(record.cif);
+
+    if (!supplierProfile) {
+      record.status = 'nok';
+      record.errors = [`CIF ${record.cif} is not registered in the simulator.`];
+      await this.uploadStore.save(record);
+      return;
+    }
+
+    const companies = this.simulationEngine.getKnownCompanies();
+    const customer = companies.find(
+      (c) => c.numericCui !== supplierProfile.numericCui,
+    ) ?? supplierProfile;
+
+    const amount = 1000 + Math.floor(Math.random() * 9000);
+    const messageId = await this.trafficGenerator.createMessageFromUpload(
+      supplierProfile,
+      customer,
+      amount,
+      record.xmlContent,
+    );
+
+    record.status = 'ok';
+    record.messageId = messageId;
+    await this.uploadStore.save(record);
+  }
+}
+
 export const MESSAGE_CQRS_HANDLERS = [
   ListEfacturaMessagesHandler,
   GetEfacturaArchiveHandler,
   UploadEfacturaInvoiceHandler,
+  GetUploadStatusHandler,
 ];

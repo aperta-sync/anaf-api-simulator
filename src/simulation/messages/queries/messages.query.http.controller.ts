@@ -13,13 +13,16 @@ import { Response } from 'express';
 import {
   DescarcareQueryDto,
   ListaMesajeFacturaQueryDto,
+  StareMesajQueryDto,
 } from './messages.request.dto';
 import { SimulationTypes } from '../../domain/simulation.types';
 import {
   GetEfacturaArchiveQuery,
+  GetUploadStatusQuery,
   ListEfacturaMessagesQuery,
 } from '../../application/messages/messages.queries';
 import { ValidateAuthorizationHeaderQuery } from '../../application/oauth/oauth.queries';
+import { UploadStatusResult } from '../../application/messages/messages.handlers';
 import { AccessTokenValidationResult } from '../../application/services/oauth-token.service';
 import {
   MockIdentityRegistryService,
@@ -128,6 +131,90 @@ export class MessagesQueryHttpController {
     }
 
     return validation;
+  }
+
+  @Get('stareMesaj')
+  async getMessageState(
+    @Query() query: StareMesajQueryDto,
+    @Headers('authorization') authorizationHeader: string | undefined,
+    @Headers('x-simulate-invalid-xml') simulateInvalidXml?: string,
+    @Headers('x-simulate-nok') simulateNok?: string,
+    @Res() response?: Response,
+  ): Promise<void> {
+    await this.assertAuthorized(authorizationHeader);
+
+    if (simulateInvalidXml?.toLowerCase() === 'true') {
+      const xml = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<header xmlns="mfp:anaf:dgti:efactura:stareMesajFactura:v1"',
+        '  stare="XML cu erori nepreluat de sistem">',
+        '  <Errors errorMessage="Simulated XML validation failure."/>',
+        '</header>',
+      ].join('\n');
+      response!.setHeader('Content-Type', 'application/xml');
+      response!.status(200).send(xml);
+      return;
+    }
+
+    if (simulateNok?.toLowerCase() === 'true') {
+      const xml = [
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+        '<header xmlns="mfp:anaf:dgti:efactura:stareMesajFactura:v1"',
+        '  stare="nok">',
+        '  <Errors errorMessage="Simulated processing failure."/>',
+        '</header>',
+      ].join('\n');
+      response!.setHeader('Content-Type', 'application/xml');
+      response!.status(200).send(xml);
+      return;
+    }
+
+    const result: UploadStatusResult | undefined = await this.queryBus.execute(
+      new GetUploadStatusQuery(query.id_incarcare),
+    );
+
+    if (!result) {
+      response!.setHeader('Content-Type', 'application/xml');
+      response!.status(404).send(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+        '<header xmlns="mfp:anaf:dgti:efactura:stareMesajFactura:v1"\n' +
+        '  stare="in prelucrare"/>',
+      );
+      return;
+    }
+
+    const errorsXml = result.errors.length > 0
+      ? result.errors.map((e) => `  <Errors errorMessage="${this.escapeXmlAttr(e)}"/>`).join('\n') + '\n'
+      : '';
+
+    const idDescarcareAttr = result.idDescarcare
+      ? `\n  id_descarcare="${result.idDescarcare}"`
+      : '';
+
+    const closingTag = errorsXml ? '>' : '/>';
+
+    const xml = [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      `<header xmlns="mfp:anaf:dgti:efactura:stareMesajFactura:v1"`,
+      `  stare="${result.stare}"${idDescarcareAttr}${closingTag}`,
+      errorsXml ? `${errorsXml}</header>` : '',
+    ].filter(Boolean).join('\n');
+
+    response!.setHeader('Content-Type', 'application/xml');
+    response!.status(200).send(xml);
+  }
+
+  private escapeXmlAttr(input: string): string {
+    return input.replace(/[<>&"']/g, (char) => {
+      switch (char) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '"': return '&quot;';
+        case "'": return '&apos;';
+        default: return char;
+      }
+    });
   }
 
   /**

@@ -148,6 +148,43 @@ export class TrafficGeneratorService implements OnModuleInit {
   }
 
   /**
+   * Creates and persists a StoredInvoiceMessage from an upload operation.
+   */
+  async createMessageFromUpload(
+    supplier: SimulationTypes.CompanyProfile,
+    customer: SimulationTypes.CompanyProfile,
+    amount: number,
+    xmlContent: string,
+  ): Promise<string> {
+    const messageId = await this.messageStore.allocateId();
+    const now = new Date();
+    const issueDate = new Date(now.getTime());
+    issueDate.setUTCDate(issueDate.getUTCDate() - (1 + Math.floor(Math.random() * 4)));
+
+    const message: SimulationTypes.StoredInvoiceMessage = {
+      id: messageId,
+      data_creare: now.toISOString(),
+      creation_date: now.toISOString(),
+      cif_emitent: supplier.numericCui,
+      cif_beneficiar: customer.numericCui,
+      cif: supplier.numericCui,
+      tip: 'FACTURA TRIMISA',
+      detalii: `Factura incarcata de ${supplier.name} catre ${customer.name}`,
+      suma: amount,
+      currency: 'RON',
+      issueDate: issueDate.toISOString().slice(0, 10),
+      payableAmount: amount,
+      supplier,
+      customer,
+      lineDescription: 'Factura incarcata prin upload',
+      createdAt: now,
+    };
+
+    await this.messageStore.save(message);
+    return messageId;
+  }
+
+  /**
    * Seeds deterministic message traffic for one preset profile.
    *
    * @param preset Seed preset name.

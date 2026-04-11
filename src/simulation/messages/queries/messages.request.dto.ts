@@ -48,3 +48,8 @@ export class DescarcareQueryDto {
   @IsString()
   id!: string;
 }
+
+export class StareMesajQueryDto {
+  @IsString()
+  id_incarcare!: string;
+}

@@ -35,3 +35,10 @@ export interface EfacturaArchiveResult {
   message: SimulationTypes.StoredInvoiceMessage;
   archive: Buffer;
 }
+
+/**
+ * Retrieves the processing status of an uploaded invoice.
+ */
+export class GetUploadStatusQuery {
+  constructor(public readonly idIncarcare: string) {}
+}
