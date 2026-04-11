@@ -230,4 +230,107 @@ describe('TrafficGeneratorService', () => {
     await noSeedService.onModuleInit();
     expect(await noSeedStore.listAll()).toHaveLength(0);
   });
+
+  describe('createMessageFromUpload', () => {
+    it('creates a message with correct supplier and customer CIFs', async () => {
+      const supplier = simulationEngine.getCompany('RO10079193')!;
+      const customer = simulationEngine.getCompany('RO10000008')!;
+
+      const messageId = await service.createMessageFromUpload(
+        supplier,
+        customer,
+        1500.5,
+        '<Invoice/>',
+      );
+
+      expect(typeof messageId).toBe('string');
+      expect(messageId.length).toBeGreaterThan(0);
+
+      const stored = await service.getStoredMessageById(messageId);
+
+      expect(stored).toBeDefined();
+      expect(stored?.cif_emitent).toBe(supplier.numericCui);
+      expect(stored?.cif_beneficiar).toBe(customer.numericCui);
+      expect(stored?.suma).toBe(1500.5);
+      expect(stored?.tip).toBe('FACTURA TRIMISA');
+    });
+  });
+
+  describe('listMessagesPaginated', () => {
+    it('returns correct pagination metadata', async () => {
+      const supplier = simulationEngine.getCompany('RO10079193')!;
+      const customer = simulationEngine.getCompany('RO10000008')!;
+
+      const now = Date.now();
+      const createdAt = new Date(now - 60_000);
+
+      await messageStore.save(
+        buildStoredMessage('PAG-1', supplier, customer, 100, createdAt),
+      );
+      await messageStore.save(
+        buildStoredMessage('PAG-2', supplier, customer, 200, createdAt),
+      );
+
+      const result = await service.listMessagesPaginated(
+        'RO10000008',
+        now - 3_600_000,
+        now,
+        1,
+        'P',
+      );
+
+      expect(result.cod).toBe(200);
+      expect(result.message).toBe('SUCCESS');
+      expect(result.numar_total_inregistrari).toBe(2);
+      expect(result.numar_total_pagini).toBe(1);
+      expect(result.index_pagina_curenta).toBe(1);
+      expect(result.numar_inregistrari_in_pagina).toBe(2);
+      expect(result.mesaje).toHaveLength(2);
+    });
+
+    it('filters by time range', async () => {
+      const supplier = simulationEngine.getCompany('RO10079193')!;
+      const customer = simulationEngine.getCompany('RO10000008')!;
+
+      const now = Date.now();
+      const insideRange = new Date(now - 60_000);
+      const outsideRange = new Date(now - 7_200_000);
+
+      await messageStore.save(
+        buildStoredMessage('TR-IN', supplier, customer, 100, insideRange),
+      );
+      await messageStore.save(
+        buildStoredMessage('TR-OUT', supplier, customer, 200, outsideRange),
+      );
+
+      const result = await service.listMessagesPaginated(
+        'RO10000008',
+        now - 3_600_000,
+        now,
+        1,
+        'P',
+      );
+
+      expect(result.numar_total_inregistrari).toBe(1);
+      expect(result.mesaje[0]?.id).toBe('TR-IN');
+    });
+
+    it('returns empty result with descriptive message when no messages match', async () => {
+      const now = Date.now();
+
+      const result = await service.listMessagesPaginated(
+        'RO10000008',
+        now - 3_600_000,
+        now,
+        1,
+        'P',
+      );
+
+      expect(result.cod).toBe(200);
+      expect(result.message).toContain('Nu exista mesaje');
+      expect(result.mesaje).toHaveLength(0);
+      expect(result.numar_total_inregistrari).toBe(0);
+      expect(result.numar_total_pagini).toBe(0);
+    });
+  });
 });
