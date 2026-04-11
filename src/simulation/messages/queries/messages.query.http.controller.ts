@@ -13,6 +13,7 @@ import { Response } from 'express';
 import {
   DescarcareQueryDto,
   ListaMesajeFacturaQueryDto,
+  ListaMesajePaginatieFacturaQueryDto,
   StareMesajQueryDto,
 } from './messages.request.dto';
 import { SimulationTypes } from '../../domain/simulation.types';
@@ -20,6 +21,7 @@ import {
   GetEfacturaArchiveQuery,
   GetUploadStatusQuery,
   ListEfacturaMessagesQuery,
+  ListMessagesPaginatedQuery,
 } from '../../application/messages/messages.queries';
 import { ValidateAuthorizationHeaderQuery } from '../../application/oauth/oauth.queries';
 import { UploadStatusResult } from '../../application/messages/messages.handlers';
@@ -131,6 +133,34 @@ export class MessagesQueryHttpController {
     }
 
     return validation;
+  }
+
+  @Get('listaMesajePaginatieFactura')
+  async listMessagesPaginated(
+    @Query() query: ListaMesajePaginatieFacturaQueryDto,
+    @Headers('authorization') authorizationHeader: string | undefined,
+    @Headers('x-simulate-wrong-certificate') wrongCertificateHeader?: string,
+  ): Promise<SimulationTypes.MessageListPaginationResponse> {
+    const auth = await this.assertAuthorized(authorizationHeader);
+    this.assertOwnershipAccess(auth, query.cif);
+
+    if (wrongCertificateHeader?.toLowerCase() === 'true') {
+      throw new ForbiddenException({
+        code: 'ANAF_CUI_MISMATCH',
+        message:
+          'ANAF_CUI_MISMATCH: The digital certificate does not match the requested CIF.',
+      });
+    }
+
+    return this.queryBus.execute(
+      new ListMessagesPaginatedQuery(
+        query.cif,
+        query.startTime,
+        query.endTime,
+        query.pagina,
+        query.filtru,
+      ),
+    );
   }
 
   @Get('stareMesaj')

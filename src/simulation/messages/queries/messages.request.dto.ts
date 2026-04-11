@@ -53,3 +53,27 @@ export class StareMesajQueryDto {
   @IsString()
   id_incarcare!: string;
 }
+
+export class ListaMesajePaginatieFacturaQueryDto {
+  @IsString()
+  cif!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  startTime!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  endTime!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pagina!: number;
+
+  @IsOptional()
+  @IsString()
+  filtru?: string;
+}

@@ -8,6 +8,7 @@ import {
   GetEfacturaArchiveQuery,
   GetUploadStatusQuery,
   ListEfacturaMessagesQuery,
+  ListMessagesPaginatedQuery,
 } from './messages.queries';
 import {
   UPLOAD_TRACKING_STORE,
@@ -255,9 +256,34 @@ export class GetUploadStatusHandler implements IQueryHandler<
   }
 }
 
+/**
+ * Handles paginated message list queries.
+ */
+@QueryHandler(ListMessagesPaginatedQuery)
+@Injectable()
+export class ListMessagesPaginatedHandler implements IQueryHandler<
+  ListMessagesPaginatedQuery,
+  SimulationTypes.MessageListPaginationResponse
+> {
+  constructor(private readonly trafficGenerator: TrafficGeneratorService) {}
+
+  async execute(
+    query: ListMessagesPaginatedQuery,
+  ): Promise<SimulationTypes.MessageListPaginationResponse> {
+    return this.trafficGenerator.listMessagesPaginated(
+      query.cif,
+      query.startTime,
+      query.endTime,
+      query.pagina,
+      query.filtru,
+    );
+  }
+}
+
 export const MESSAGE_CQRS_HANDLERS = [
   ListEfacturaMessagesHandler,
   GetEfacturaArchiveHandler,
   UploadEfacturaInvoiceHandler,
   GetUploadStatusHandler,
+  ListMessagesPaginatedHandler,
 ];

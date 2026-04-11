@@ -317,6 +317,84 @@ export class TrafficGeneratorService implements OnModuleInit {
   }
 
   /**
+   * Lists messages with time-range filtering and pagination.
+   */
+  async listMessagesPaginated(
+    rawCui: string,
+    startTimeMs: number,
+    endTimeMs: number,
+    page: number,
+    filtru?: string,
+  ): Promise<SimulationTypes.MessageListPaginationResponse> {
+    const normalized = this.simulationEngine.normalizeCui(rawCui);
+    const filter = this.normalizeFilter(filtru);
+    const startThreshold = new Date(startTimeMs);
+    const endThreshold = new Date(endTimeMs);
+    const pageSize = 50;
+
+    const allMessages =
+      filter === 'P'
+        ? await this.messageStore.listForBeneficiary(normalized.numeric)
+        : await this.messageStore.listAll();
+
+    const filtered = allMessages
+      .filter(
+        (message) =>
+          message.createdAt >= startThreshold &&
+          message.createdAt <= endThreshold,
+      )
+      .filter((message) =>
+        this.matchesFilter(message, normalized.numeric, filter),
+      )
+      .sort(
+        (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+      );
+
+    const totalRecords = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const startIndex = (currentPage - 1) * pageSize;
+    const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
+
+    const mesaje = pageSlice.map((message) => ({
+      id: message.id,
+      data_creare: message.data_creare,
+      creation_date: message.creation_date,
+      cif_emitent: message.cif_emitent,
+      cif_beneficiar: message.cif_beneficiar,
+      cif: message.cif,
+      tip: message.tip,
+      detalii: message.detalii,
+      suma: message.suma,
+      currency: message.currency,
+    }));
+
+    if (totalRecords === 0) {
+      return {
+        cod: 200,
+        message: `Nu exista mesaje in intervalul ${startTimeMs} - ${endTimeMs}`,
+        mesaje: [],
+        numar_inregistrari_in_pagina: 0,
+        numar_total_inregistrari_per_pagina: pageSize,
+        numar_total_inregistrari: 0,
+        numar_total_pagini: 0,
+        index_pagina_curenta: currentPage,
+      };
+    }
+
+    return {
+      cod: 200,
+      message: 'SUCCESS',
+      mesaje,
+      numar_inregistrari_in_pagina: mesaje.length,
+      numar_total_inregistrari_per_pagina: pageSize,
+      numar_total_inregistrari: totalRecords,
+      numar_total_pagini: totalPages,
+      index_pagina_curenta: currentPage,
+    };
+  }
+
+  /**
    * Adds optional synthetic near-real-time traffic for legacy scenarios.
    *
    * @param cifBeneficiar Beneficiary numeric CUI.
