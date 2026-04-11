@@ -135,6 +135,34 @@ export namespace SimulationTypes {
     mesaje: MessageListEntry[];
   }
 
+  export type UploadStandard = 'UBL' | 'CII' | 'CN' | 'RASP';
+
+  export type UploadStatus =
+    | 'in prelucrare'
+    | 'ok'
+    | 'nok'
+    | 'XML cu erori nepreluat de sistem';
+
+  export interface UploadedInvoiceRecord {
+    indexIncarcare: string;
+    cif: string;
+    standard: UploadStandard;
+    xmlContent: string;
+    uploadedAt: Date;
+    processingCompleteAt: Date;
+    messageId: string | null;
+    status: UploadStatus;
+    errors: string[];
+  }
+
+  export interface MessageListPaginationResponse extends MessageListResponse {
+    numar_inregistrari_in_pagina: number;
+    numar_total_inregistrari_per_pagina: number;
+    numar_total_inregistrari: number;
+    numar_total_pagini: number;
+    index_pagina_curenta: number;
+  }
+
   export interface StoredInvoiceMessage extends MessageListEntry {
     issueDate: string;
     payableAmount: number;
