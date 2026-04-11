@@ -44,6 +44,7 @@ export namespace SimulationTypes {
 
   export interface SimulationConfig {
     latencyMs: number;
+    processingDelayMs: number;
     errorRate: number;
     rateLimitMode: RateLimitMode;
     rateLimitWindowMs: number;

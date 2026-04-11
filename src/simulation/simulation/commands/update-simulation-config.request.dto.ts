@@ -24,6 +24,15 @@ export class UpdateSimulationConfigDto {
   latencyMs?: number;
 
   /**
+   * The processingDelayMs value.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(60_000)
+  processingDelayMs?: number;
+
+  /**
    * The errorRate value.
    */
   @IsOptional()
