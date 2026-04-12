@@ -1,5 +1,12 @@
 import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 /**
  * Data transfer object for ListaMesajeFacturaQueryDto.
@@ -74,6 +81,11 @@ export class ListaMesajePaginatieFacturaQueryDto {
   pagina!: number;
 
   @IsOptional()
+  @Type(() => String)
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsIn(['P', 'T', 'E', 'R'])
   @IsString()
   filtru?: string;
 }

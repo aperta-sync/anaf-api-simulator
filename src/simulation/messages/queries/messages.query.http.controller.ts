@@ -187,10 +187,12 @@ export class MessagesQueryHttpController {
     }
 
     if (simulateNok?.toLowerCase() === 'true') {
+      // Real ANAF includes id_descarcare for nok (ZIP contains error details)
       const xml = [
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
         '<header xmlns="mfp:anaf:dgti:efactura:stareMesajFactura:v1"',
-        '  stare="nok">',
+        `  stare="nok"`,
+        `  id_descarcare="sim-nok-${Date.now()}">`,
         '  <Errors errorMessage="Simulated processing failure."/>',
         '</header>',
       ].join('\n');
@@ -204,8 +206,9 @@ export class MessagesQueryHttpController {
     );
 
     if (!result) {
+      // Real ANAF always returns HTTP 200 — status conveyed via XML stare attribute
       response!.setHeader('Content-Type', 'application/xml');
-      response!.status(404).send(
+      response!.status(200).send(
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
         '<header xmlns="mfp:anaf:dgti:efactura:stareMesajFactura:v1"\n' +
         '  stare="in prelucrare"/>',

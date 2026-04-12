@@ -367,16 +367,23 @@ export class SimulationEngineService implements OnModuleInit {
       .toISOString()
       .slice(0, 10);
 
+    const nrRegCom =
+      company.nrRegCom ??
+      `J${40 + (hash % 12)}/${1000 + (hash % 7000)}/2019`;
+    const codPostal =
+      `${100000 + (hash % 899999)}`;
+    const countyCode = company.countyCode ?? company.county.slice(0, 2).toUpperCase();
+
     return {
       date_generale: {
         cui: Number(company.numericCui),
         denumire: company.name,
         adresa: company.address,
-        nrRegCom: `J${40 + (hash % 12)}/${1000 + (hash % 7000)}/2019`,
+        nrRegCom,
         telefon: `+40 7${10 + (hash % 89)} ${100 + (hash % 899)} ${
           100 + ((hash * 7) % 899)
         }`,
-        codPostal: `${100000 + (hash % 899999)}`,
+        codPostal,
         data_inregistrare: registrationDate,
         cod_CAEN: `${4711 + (hash % 200)}`,
       },
@@ -389,6 +396,18 @@ export class SimulationEngineService implements OnModuleInit {
         statusRTVAI: false,
         dataInregistrare: requestDate,
         dataAnulare: null,
+      },
+      adresa_sediu_social: {
+        sdenumire_Strada: company.streetName ?? `Str. Independentei`,
+        snumar_Strada: company.streetNumber ?? `${1 + (hash % 97)}`,
+        sdenumire_Localitate: company.locality ?? company.city,
+        scod_Localitate: `${hash % 999}`,
+        sdenumire_Judet: company.county,
+        scod_JudetAuto: countyCode,
+        scod_Judet: `${40 + (hash % 12)}`,
+        stara: company.countryCode ?? 'RO',
+        sdetalii_Adresa: '',
+        scod_Postal: codPostal,
       },
     };
   }
@@ -846,6 +865,11 @@ export class SimulationEngineService implements OnModuleInit {
       address: company.address,
       countryCode: (company.countryCode ?? 'RO').toUpperCase(),
       vatPayer: company.vatPayer ?? true,
+      nrRegCom: company.nrRegCom,
+      streetName: company.streetName,
+      streetNumber: company.streetNumber,
+      locality: company.locality,
+      countyCode: company.countyCode,
     };
 
     this.registry.set(normalized.numeric, seededProfile);

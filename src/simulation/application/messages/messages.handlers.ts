@@ -148,6 +148,9 @@ export class UploadEfacturaInvoiceHandler implements ICommandHandler<
       messageId: null,
       status: 'in prelucrare',
       errors: [],
+      extern: command.extern,
+      autofactura: command.autofactura,
+      executare: command.executare,
     };
 
     await this.uploadStore.save(record);
@@ -231,7 +234,13 @@ export class GetUploadStatusHandler implements IQueryHandler<
     const supplierProfile = this.simulationEngine.getCompany(record.cif);
 
     if (!supplierProfile) {
+      // Real ANAF includes id_descarcare for nok (ZIP contains error details)
+      const errorMessageId = await this.trafficGenerator.createErrorMessage(
+        record.cif,
+        `CIF ${record.cif} is not registered in the simulator.`,
+      );
       record.status = 'nok';
+      record.messageId = errorMessageId;
       record.errors = [`CIF ${record.cif} is not registered in the simulator.`];
       await this.uploadStore.save(record);
       return;
@@ -248,6 +257,7 @@ export class GetUploadStatusHandler implements IQueryHandler<
       customer,
       amount,
       record.xmlContent,
+      record.indexIncarcare,
     );
 
     record.status = 'ok';

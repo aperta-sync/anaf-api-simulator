@@ -61,7 +61,7 @@ function buildStoredMessage(
   return {
     id,
     data_creare: createdAt.toISOString(),
-    creation_date: createdAt.toISOString(),
+    id_solicitare: id ?? 'SIM-777',
     cif_emitent: supplier.numericCui,
     cif_beneficiar: customer.numericCui,
     cif: supplier.numericCui,

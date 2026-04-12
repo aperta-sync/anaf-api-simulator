@@ -402,8 +402,10 @@ describe('AnafMockServer (e2e)', () => {
     expect(issueDateMatch).toBeTruthy();
 
     const issueDate = issueDateMatch![1];
+    // data_creare is in ANAF format YYYYMMDDHHmm (e.g. "202604121530")
+    const dc = message.data_creare;
     const uploadDay = new Date(
-      `${message.data_creare.slice(0, 10)}T00:00:00.000Z`,
+      `${dc.slice(0, 4)}-${dc.slice(4, 6)}-${dc.slice(6, 8)}T00:00:00.000Z`,
     );
     const issueDay = new Date(`${issueDate}T00:00:00.000Z`);
     const driftDays = Math.round(
@@ -571,11 +573,12 @@ describe('AnafMockServer (e2e)', () => {
     expect(response.text).toContain('errorMessage=');
   });
 
-  it('returns 404 XML for unknown upload index in stareMesaj', async () => {
+  it('returns 200 XML with stare="in prelucrare" for unknown upload index in stareMesaj', async () => {
+    // Real ANAF always returns HTTP 200 — status conveyed via XML stare attribute
     const response = await request(app.getHttpServer())
       .get('/prod/FCTEL/rest/stareMesaj?id_incarcare=99999999999')
       .set('Authorization', `Bearer ${accessToken}`)
-      .expect(404);
+      .expect(200);
 
     expect(response.text).toContain('stare="in prelucrare"');
   });
@@ -596,7 +599,10 @@ describe('AnafMockServer (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    expect(response.body.cod).toBe(200);
+    expect(response.body.eroare).toBeNull();
+    expect(response.body).toHaveProperty('titlu');
+    expect(response.body).toHaveProperty('serial');
+    expect(response.body).toHaveProperty('cui');
     expect(response.body).toHaveProperty('numar_total_inregistrari');
     expect(response.body).toHaveProperty('numar_total_pagini');
     expect(response.body).toHaveProperty('index_pagina_curenta');

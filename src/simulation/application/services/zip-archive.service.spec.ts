@@ -30,7 +30,7 @@ function buildMessage(id: string): SimulationTypes.StoredInvoiceMessage {
   return {
     id,
     data_creare: '2026-04-10T10:00:00.000Z',
-    creation_date: '2026-04-10T10:00:00.000Z',
+    id_solicitare: id ?? 'SIM-777',
     cif_emitent: supplier.numericCui,
     cif_beneficiar: customer.numericCui,
     cif: supplier.numericCui,

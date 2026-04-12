@@ -41,7 +41,7 @@ function buildStoredMessage(
   return {
     id,
     data_creare: createdAt.toISOString(),
-    creation_date: createdAt.toISOString(),
+    id_solicitare: id ?? 'SIM-777',
     cif_emitent: supplier.numericCui,
     cif_beneficiar: customer.numericCui,
     cif: supplier.numericCui,
@@ -94,15 +94,14 @@ describe('TrafficGeneratorService', () => {
 
     const incoming = await service.listMessages('RO10000008', 40, 'P');
     expect(incoming.length).toBeGreaterThan(0);
-    expect(
-      incoming.every((message) => message.cif_beneficiar === '10000008'),
-    ).toBe(true);
+    // P filter returns invoices where the queried CIF is the beneficiary.
+    // The ANAF `cif` field is the emitter, so it should NOT be the queried CIF.
+    expect(incoming.every((m) => m.cif !== '10000008')).toBe(true);
 
     const outgoing = await service.listMessages('RO10000008', 40, 'T');
     expect(outgoing.length).toBeGreaterThan(0);
-    expect(
-      outgoing.every((message) => message.cif_emitent === '10000008'),
-    ).toBe(true);
+    // T filter returns invoices where the queried CIF is the emitter (cif field).
+    expect(outgoing.every((m) => m.cif === '10000008')).toBe(true);
 
     const errorMessages = await service.listMessages('RO10000008', 40, 'E');
     expect(errorMessages.length).toBeGreaterThan(0);
@@ -123,9 +122,8 @@ describe('TrafficGeneratorService', () => {
     ).toBe(true);
 
     const fallback = await service.listMessages('RO10000008', 40, 'unknown');
-    expect(
-      fallback.every((message) => message.cif_beneficiar === '10000008'),
-    ).toBe(true);
+    // Unknown filter falls back to P (incoming) — same as incoming check
+    expect(fallback.every((m) => m.cif !== '10000008')).toBe(true);
   });
 
   it('filters out old messages based on lookback window and sorts by newest first', async () => {
@@ -279,8 +277,8 @@ describe('TrafficGeneratorService', () => {
         'P',
       );
 
-      expect(result.cod).toBe(200);
-      expect(result.message).toBe('SUCCESS');
+      expect(result.eroare).toBeNull();
+      expect(result.titlu).toBeDefined();
       expect(result.numar_total_inregistrari).toBe(2);
       expect(result.numar_total_pagini).toBe(1);
       expect(result.index_pagina_curenta).toBe(1);
@@ -326,8 +324,8 @@ describe('TrafficGeneratorService', () => {
         'P',
       );
 
-      expect(result.cod).toBe(200);
-      expect(result.message).toContain('Nu exista mesaje');
+      expect(result.eroare).toBeNull();
+      expect(result.titlu).toContain('Lista Mesaje');
       expect(result.mesaje).toHaveLength(0);
       expect(result.numar_total_inregistrari).toBe(0);
       expect(result.numar_total_pagini).toBe(0);

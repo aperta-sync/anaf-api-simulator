@@ -68,6 +68,42 @@ export class SeedCompanyDto {
   @IsOptional()
   @IsBoolean()
   vatPayer?: boolean;
+
+  /**
+   * Trade register number (e.g. "J2022001847044"). Auto-generated if not provided.
+   */
+  @IsOptional()
+  @IsString()
+  nrRegCom?: string;
+
+  /**
+   * Street name for adresa_sediu_social (e.g. "NICOLAE TONITZA").
+   */
+  @IsOptional()
+  @IsString()
+  streetName?: string;
+
+  /**
+   * Street number for adresa_sediu_social (e.g. "97").
+   */
+  @IsOptional()
+  @IsString()
+  streetNumber?: string;
+
+  /**
+   * Locality name for adresa_sediu_social (e.g. "Sat Scorțeni Com. Scorțeni").
+   */
+  @IsOptional()
+  @IsString()
+  locality?: string;
+
+  /**
+   * County auto code for adresa_sediu_social (e.g. "BC"). Auto-derived from county if not provided.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z]{2}$/)
+  countyCode?: string;
 }
 
 /**

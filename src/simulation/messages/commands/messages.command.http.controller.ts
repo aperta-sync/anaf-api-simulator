@@ -80,7 +80,14 @@ export class MessagesCommandHttpController {
     const result = await this.commandBus.execute<
       UploadEfacturaInvoiceCommand,
       UploadInvoiceResult
-    >(new UploadEfacturaInvoiceCommand(query.cif, query.standard, xmlContent));
+    >(new UploadEfacturaInvoiceCommand(
+      query.cif,
+      query.standard,
+      xmlContent,
+      query.extern,
+      query.autofactura,
+      query.executare,
+    ));
 
     const successXml = [
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
