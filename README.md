@@ -51,6 +51,25 @@ The project includes a multi-stage **lightweight Dockerfile** (Alpine-based) opt
      anaf-mock-server:latest
    ```
 
+## Documentation
+
+The project maintains a high-fidelity sync with official ANAF documentation.
+
+- **[Official Docs](docs/anaf/official/)**: Original PDFs and registration procedures.
+- **[Manual Guides](docs/anaf/manual/)**: Human-readable summaries of API endpoints and OAuth2 registration.
+- **[Scraped Assets](docs/anaf/scraped/)**:
+  - **Swagger JSONs**: `docs/anaf/scraped/technical/swagger/` contains automated OpenAPI extractions.
+  - **Technical Specs**: `docs/anaf/scraped/technical/` contains raw HTML and text limit files.
+
+### CI/CD Documentation Parity
+Our GitHub Action `Check ANAF Documentation Parity` ensures the codebase stays in sync. If ANAF updates their documentation, the pipeline will fail, alerting us to update the mock server.
+
+To update the scraped documentation locally, run:
+```bash
+node scripts/anaf-scraper.mjs
+```
+
+
 ---
 
 ## Configuration Reference

@@ -1,0 +1,140 @@
+{
+  "https://mfinante.gov.ro/static/10/eFactura/PrezentareE-factura.pdf": {
+    "etag": "\"61404b00-32501\"",
+    "lastModified": "Tue, 14 Sep 2021 07:10:56 GMT",
+    "contentLength": "206081",
+    "downloadedAt": "2026-04-14T06:36:50.409Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/prezentare api efactura.pdf": {
+    "etag": "\"67ac9c9c-29dd4\"",
+    "lastModified": "Wed, 12 Feb 2025 13:05:32 GMT",
+    "contentLength": "171476",
+    "downloadedAt": "2026-04-14T06:36:50.541Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/limiteApeluriAPI.txt": {
+    "etag": "\"66014169-42a\"",
+    "lastModified": "Mon, 25 Mar 2024 09:18:33 GMT",
+    "contentLength": "1066",
+    "downloadedAt": "2026-04-14T06:36:50.631Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/roefacturavalidator_12122024.zip": {
+    "etag": "\"675ab284-38b29fe\"",
+    "lastModified": "Thu, 12 Dec 2024 09:53:08 GMT",
+    "contentLength": "59451902",
+    "downloadedAt": "2026-04-14T06:37:08.543Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/verifstandalone.zip": {
+    "etag": "\"69b2fe8c-3952938\"",
+    "lastModified": "Thu, 12 Mar 2026 17:57:32 GMT",
+    "contentLength": "60107064",
+    "downloadedAt": "2026-04-14T06:37:26.532Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/GenerareFactura.zip": {
+    "etag": "\"67ac51a8-27b7346\"",
+    "lastModified": "Wed, 12 Feb 2025 07:45:44 GMT",
+    "contentLength": "41644870",
+    "downloadedAt": "2026-04-14T06:37:39.043Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/Instructiuni.txt": {
+    "etag": "\"618ba710-224\"",
+    "lastModified": "Wed, 10 Nov 2021 11:03:44 GMT",
+    "contentLength": "548",
+    "downloadedAt": "2026-04-14T06:37:39.132Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/GenerareFacturaAll.zip": {
+    "etag": "\"67ac51be-6fafe33\"",
+    "lastModified": "Wed, 12 Feb 2025 07:46:06 GMT",
+    "contentLength": "117112371",
+    "downloadedAt": "2026-04-14T06:38:14.065Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/Instructiuni_facturaAll.txt": {
+    "etag": "\"65cc8b41-226\"",
+    "lastModified": "Wed, 14 Feb 2024 09:43:29 GMT",
+    "contentLength": "550",
+    "downloadedAt": "2026-04-14T06:38:14.160Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/exemple_Invoice_CreditNote.zip": {
+    "etag": "\"63525177-1467\"",
+    "lastModified": "Fri, 21 Oct 2022 07:59:51 GMT",
+    "contentLength": "5223",
+    "downloadedAt": "2026-04-14T06:38:14.250Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/eFactura_CII_exempleXML.zip": {
+    "etag": "\"618e1e20-5eef\"",
+    "lastModified": "Fri, 12 Nov 2021 07:56:16 GMT",
+    "contentLength": "24303",
+    "downloadedAt": "2026-04-14T06:38:14.341Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/Informatii_ver.1.0.9.txt": {
+    "etag": "\"66614224-1e7\"",
+    "lastModified": "Thu, 06 Jun 2024 04:59:16 GMT",
+    "contentLength": "487",
+    "downloadedAt": "2026-04-14T06:38:14.434Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/ro16931-ubl-1.0.9.zip": {
+    "etag": "\"666140df-19990\"",
+    "lastModified": "Thu, 06 Jun 2024 04:53:51 GMT",
+    "contentLength": "104848",
+    "downloadedAt": "2026-04-14T06:38:14.534Z"
+  },
+  "http://static.anaf.ro/static/10/Anaf/Informatii_R/Informatii_modificare_CIUS_RO.pdf": {
+    "etag": "\"1edeb-5ef1556502d40\"",
+    "lastModified": "Mon, 05 Dec 2022 14:16:45 GMT",
+    "hash": "c025c06e6f19076ebd7040be5687552bcb7ec5c643180b40f3539a3e3679334f",
+    "downloadedAt": "2026-04-14T06:40:22.761Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/ro16931-ubl-1.0.8.zip": {
+    "etag": "\"638f3a48-19d34\"",
+    "lastModified": "Tue, 06 Dec 2022 12:49:12 GMT",
+    "contentLength": "105780",
+    "downloadedAt": "2026-04-14T06:38:15.027Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/ro16931-ubl-1.0.7.zip": {
+    "etag": "\"634e7b00-174fd\"",
+    "lastModified": "Tue, 18 Oct 2022 10:08:00 GMT",
+    "contentLength": "95485",
+    "downloadedAt": "2026-04-14T06:38:15.128Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/validaresemnatura.html": {
+    "etag": "W/\"66d6d804-161b\"",
+    "lastModified": "Tue, 03 Sep 2024 09:33:56 GMT",
+    "hash": "a8173e8628c7efc43fc835404ed5f7080bc45e0ba382f5b523e54010132dd93e",
+    "downloadedAt": "2026-04-14T06:55:34.056Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/upload.html": {
+    "etag": "W/\"67a08def-23d0c\"",
+    "lastModified": "Mon, 03 Feb 2025 09:35:43 GMT",
+    "hash": "79d2e812db3ec62712ec677ea39cc74a692f13e8c1d00ef6f274f2d2e2c91d09",
+    "downloadedAt": "2026-04-14T06:55:34.158Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/staremesaj.html": {
+    "etag": "W/\"61814141-17da\"",
+    "lastModified": "Tue, 02 Nov 2021 13:46:41 GMT",
+    "hash": "4ff8235e85d6b360321873f4b3153752095eccedb2b0503431d6701f96428f56",
+    "downloadedAt": "2026-04-14T06:55:34.246Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/listamesaje.html": {
+    "etag": "W/\"65b4ff22-5b81\"",
+    "lastModified": "Sat, 27 Jan 2024 13:03:30 GMT",
+    "hash": "c77ded9da597aabaf586534360014f1c145d473f519544456c8ea6284f5a35e4",
+    "downloadedAt": "2026-04-14T06:55:34.334Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/descarcare.html": {
+    "etag": "W/\"6181410a-f16\"",
+    "lastModified": "Tue, 02 Nov 2021 13:45:46 GMT",
+    "hash": "fe56d5ecb6a073b5a7eed70a8c17b59d59e23ccd0326f727af3b7658083d2eb8",
+    "downloadedAt": "2026-04-14T06:55:34.423Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/validare.html": {
+    "etag": "W/\"635bb49e-e3ec\"",
+    "lastModified": "Fri, 28 Oct 2022 10:53:18 GMT",
+    "hash": "53daf8a1f6db26457680ee9a2f2ca42de652ec2ab17448e9b104ad0e37062b4e",
+    "downloadedAt": "2026-04-14T06:55:34.509Z"
+  },
+  "https://mfinante.gov.ro/static/10/eFactura/xmltopdf.html": {
+    "etag": "W/\"65951859-1b53d\"",
+    "lastModified": "Wed, 03 Jan 2024 08:18:33 GMT",
+    "hash": "d5b5caba602bb88c85ca457d3205e52f1632c0663f242640201d13dc6e721db1",
+    "downloadedAt": "2026-04-14T06:55:34.600Z"
+  }
+}

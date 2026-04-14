@@ -1,0 +1,9 @@
+1. Se dezarhiveaza "GenerareFactura.zip"
+2. In urma dezarhivarii se salveaza 2 foldere: "dist" si "jasper"
+3. Se ruleaza "generareFactura.jar" din folder-ul dist
+4. In urma rularii apare o fereastra ce are urmatorul buton: Select fisier XML
+5. Se selecteaza fisierul XML ce se doreste a fi convertit in PDF
+6. Se apasa butonul "Generare PDF"
+7. Fisierul PDF, impreuna cu eventuale atasamente, a fost generat si salvat in folder-ul in care se afla salvat fisierul XML selectat anterior.
+
+Atentie! Aplicatia necesita java 8 anterior instalat!

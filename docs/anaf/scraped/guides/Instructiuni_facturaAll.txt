@@ -1,0 +1,9 @@
+1. Se dezarhiveaza "GenerareFacturaAll.zip"
+2. In urma dezarhivarii se salveaza 2 foldere: "dist" si "jasper"
+3. Se ruleaza "generareFacturaAll.jar" din folder-ul dist. Tot aici anterior se salveaza xml-urile de facturi !
+4. Se genereaza facturile in formatt PDF si eventualele atasamente pt toate xml-urile din folder-ul unde au fost salvate cele 2 foldere de la punctul 2.
+7. Se genereaza fisierele Rezultate.txt si/sau Erori.txt
+
+Atentie! 
+Aplicatia necesita java 8 anterior instalat!
+XML-urile de facturi se salveaza in folder-ul dist !

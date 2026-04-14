@@ -15,6 +15,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-anaf-docs:
+    name: Check ANAF Documentation Parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Scraper
+        run: node scripts/anaf-scraper.mjs
+
+      - name: Check for changes
+        run: |
+          if [ -n "$(git status --porcelain docs/anaf/scraped)" ]; then
+            echo "❌ ANAF Documentation has changed! Please run 'node scripts/anaf-scraper.mjs' locally and commit the changes."
+            git status --porcelain docs/anaf/scraped
+            exit 1
+          else
+            echo "✅ ANAF Documentation is up to date."
+          fi
+
   test-build-docker:
     name: Test, Build, Docker Validate
     runs-on: ubuntu-latest
