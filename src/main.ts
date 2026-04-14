@@ -2,6 +2,12 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AnafMockServerModule } from './anaf-mock-server.module';
+import { McpService } from './mcp/mcp.service';
+import { SimulationEngineService } from './simulation/application/services/simulation-engine.service';
+import { MockApplicationRegistryService } from './simulation/application/services/mock-application-registry.service';
+import { MockIdentityRegistryService } from './simulation/application/services/mock-identity-registry.service';
+import { UblGeneratorService } from './simulation/application/services/ubl-generator.service';
+import { AnafRateLimitStoreService } from './simulation/infrastructure/persistence/anaf-rate-limit-store.service';
 
 /**
  * Bootstraps the ANAF mock server HTTP application.
@@ -65,11 +71,21 @@ async function bootstrap() {
     },
   });
 
+  app.get(McpService).initialize(
+    app.get(SimulationEngineService),
+    document,
+    app.get(MockApplicationRegistryService),
+    app.get(MockIdentityRegistryService),
+    app.get(UblGeneratorService),
+    app.get(AnafRateLimitStoreService),
+  );
+
   const port = Number(process.env.ANAF_MOCK_PORT ?? 3003);
   await app.listen(port);
 
   logger.log(`ANAF mock server running on port ${port}`);
   logger.log(`Swagger UI available at http://localhost:${port}/swagger`);
+  logger.log(`MCP SSE endpoint: http://localhost:${port}/mcp/sse`);
 }
 
 bootstrap();

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Golden Sample UBL 2.1 Invoice — ANAF e-Factura compliant
+  =========================================================
+  This file represents a minimal but valid UBL 2.1 invoice that
+  passes ANAF schema validation. It can be used as a template for
+  integration testing against the mock server.
+
+  Supplier : Aperta Sync Consulting SRL (RO10000008)
+  Customer : Delta Logistics Solutions SRL (RO10079193)
+  Amount   : 1,000.00 RON
+  Standard : UBL (upload with ?standard=UBL&cif=10000008)
+-->
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+
+  <!-- EN 16931 customization identifier — mandatory for ANAF -->
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017</cbc:CustomizationID>
+
+  <!-- ANAF profile identifier — mandatory -->
+  <cbc:ProfileID>urn:fdc:anaf.ro:efactura:1.0</cbc:ProfileID>
+
+  <!-- Unique invoice number within the supplier's scope -->
+  <cbc:ID>INV-SAMPLE-001</cbc:ID>
+
+  <!-- Issue date in YYYY-MM-DD format -->
+  <cbc:IssueDate>2025-01-01</cbc:IssueDate>
+
+  <!-- Invoice type code: 380 = Commercial Invoice -->
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+
+  <!-- Currency of all monetary amounts -->
+  <cbc:DocumentCurrencyCode>RON</cbc:DocumentCurrencyCode>
+
+  <!-- Buyer reference (optional but recommended) -->
+  <cbc:BuyerReference>PO-2025-001</cbc:BuyerReference>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SUPPLIER (AccountingSupplierParty)
+       ═══════════════════════════════════════════════════════════ -->
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName>
+        <cbc:Name>Aperta Sync Consulting SRL</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Bd. Unirii 12</cbc:StreetName>
+        <cbc:CityName>Bucuresti</cbc:CityName>
+        <cbc:CountrySubentity>Bucuresti</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>RO</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <!-- Romanian VAT registration number (CUI with RO prefix) -->
+        <cbc:CompanyID>RO10000008</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>Aperta Sync Consulting SRL</cbc:RegistrationName>
+        <cbc:CompanyID>RO10000008</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CUSTOMER (AccountingCustomerParty)
+       ═══════════════════════════════════════════════════════════ -->
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName>
+        <cbc:Name>Delta Logistics Solutions SRL</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Str. Dorobantilor 28</cbc:StreetName>
+        <cbc:CityName>Cluj-Napoca</cbc:CityName>
+        <cbc:CountrySubentity>Cluj</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>RO</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>RO10079193</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>Delta Logistics Solutions SRL</cbc:RegistrationName>
+        <cbc:CompanyID>RO10079193</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       PAYMENT TERMS
+       ═══════════════════════════════════════════════════════════ -->
+  <cac:PaymentTerms>
+    <cbc:Note>Net 30 days</cbc:Note>
+  </cac:PaymentTerms>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       TAX TOTAL
+       ═══════════════════════════════════════════════════════════ -->
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="RON">190.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="RON">1000.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="RON">190.00</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <!-- S = Standard rate VAT -->
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>19</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MONETARY TOTALS
+       ═══════════════════════════════════════════════════════════ -->
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="RON">1000.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="RON">1000.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="RON">1190.00</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="RON">1190.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       INVOICE LINE
+       ═══════════════════════════════════════════════════════════ -->
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="EA">1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="RON">1000.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Software development consulting services — January 2025</cbc:Description>
+      <cbc:Name>IT Consulting Services</cbc:Name>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>19</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="RON">1000.00</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>
+
+</Invoice>

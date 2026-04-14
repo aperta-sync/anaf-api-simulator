@@ -26,4 +26,15 @@ export class AnafRateLimitStoreService implements AnafRateLimitStorePort {
     this.counters.set(key, next);
     return { allowed: true, currentCount: next, limit };
   }
+
+  /**
+   * Returns the current counter value for a key without incrementing it.
+   * Used by monitoring/MCP tools that need a read-only view of quota usage.
+   *
+   * @param key Rate-limit key following the `{endpoint}:{discriminator}:{YYYY-MM-DD}` convention.
+   * @returns Current count, or 0 if the key has never been hit today.
+   */
+  peekCount(key: string): number {
+    return this.counters.get(key) ?? 0;
+  }
 }

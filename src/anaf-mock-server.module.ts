@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { ScheduleModule } from '@nestjs/schedule';
+import { McpModule } from './mcp/mcp.module';
 import { DeveloperPortalCommandHttpController } from './simulation/developer-portal/commands/developer-portal.command.http.controller';
 import { DeveloperPortalIdentityCommandHttpController } from './simulation/developer-portal/commands/developer-portal.identity.command.http.controller';
 import { OAuthCommandHttpController } from './simulation/oauth/commands/oauth.command.http.controller';
@@ -37,7 +38,7 @@ import { AnafRateLimitStoreService } from './simulation/infrastructure/persisten
 import { AnafRateLimitService } from './simulation/application/services/anaf-rate-limit.service';
 
 @Module({
-  imports: [CqrsModule, ScheduleModule.forRoot()],
+  imports: [CqrsModule, ScheduleModule.forRoot(), McpModule],
   controllers: [
     DeveloperPortalCommandHttpController,
     DeveloperPortalIdentityCommandHttpController,
