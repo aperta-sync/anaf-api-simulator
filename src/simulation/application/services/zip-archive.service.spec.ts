@@ -34,6 +34,7 @@ function buildMessage(id: string): SimulationTypes.StoredInvoiceMessage {
     cif_emitent: supplier.numericCui,
     cif_beneficiar: customer.numericCui,
     cif: supplier.numericCui,
+    id_solicitare: id,
     tip: 'FACTURA PRIMITA',
     detalii: 'Factura de test',
     suma: 120.5,

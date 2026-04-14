@@ -1,11 +1,15 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 /**
  * Query parameter DTO for the upload endpoint.
+ *
+ * Validation is intentionally relaxed here — ANAF returns XML 200 errors
+ * for invalid `standard` and non-numeric `cif`, not HTTP 400.  The
+ * controller performs those checks so the mock can replicate the exact
+ * ANAF error shapes.
  */
 export class UploadInvoiceQueryDto {
   @IsString()
-  @IsIn(['UBL', 'CII', 'CN', 'RASP'])
   standard!: string;
 
   @IsString()

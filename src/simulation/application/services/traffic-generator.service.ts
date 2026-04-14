@@ -8,6 +8,14 @@ import { SimulationTypes } from '../../domain/simulation.types';
 
 type MessageFilter = 'P' | 'T' | 'E' | 'R';
 
+export interface PaginatedMessagesResult {
+  messages: SimulationTypes.StoredInvoiceMessage[];
+  totalRecords: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}
+
 interface SeedMessageTemplate {
   supplierCui: string;
   customerCui: string;
@@ -89,7 +97,7 @@ export class TrafficGeneratorService implements OnModuleInit {
     rawCui: string,
     zile: number,
     filtru?: string,
-  ): Promise<SimulationTypes.MessageListEntry[]> {
+  ): Promise<SimulationTypes.StoredInvoiceMessage[]> {
     const normalized = this.simulationEngine.normalizeCui(rawCui);
 
     // Keep optional synthetic traffic for backwards compatibility, disabled by default.
@@ -111,19 +119,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       )
       .sort(
         (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
-      )
-      .map((message) => ({
-        id: message.id,
-        data_creare: message.data_creare,
-        creation_date: message.creation_date,
-        cif_emitent: message.cif_emitent,
-        cif_beneficiar: message.cif_beneficiar,
-        cif: message.cif,
-        tip: message.tip,
-        detalii: message.detalii,
-        suma: message.suma,
-        currency: message.currency,
-      }));
+      );
   }
 
   /**
@@ -168,6 +164,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       cif_emitent: supplier.numericCui,
       cif_beneficiar: customer.numericCui,
       cif: supplier.numericCui,
+      id_solicitare: messageId,
       tip: 'FACTURA TRIMISA',
       detalii: `Factura incarcata de ${supplier.name} catre ${customer.name}`,
       suma: amount,
@@ -325,12 +322,12 @@ export class TrafficGeneratorService implements OnModuleInit {
     endTimeMs: number,
     page: number,
     filtru?: string,
-  ): Promise<SimulationTypes.MessageListPaginationResponse> {
+  ): Promise<PaginatedMessagesResult> {
     const normalized = this.simulationEngine.normalizeCui(rawCui);
     const filter = this.normalizeFilter(filtru);
     const startThreshold = new Date(startTimeMs);
     const endThreshold = new Date(endTimeMs);
-    const pageSize = 50;
+    const pageSize = 500;
 
     const allMessages =
       filter === 'P'
@@ -356,41 +353,12 @@ export class TrafficGeneratorService implements OnModuleInit {
     const startIndex = (currentPage - 1) * pageSize;
     const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
 
-    const mesaje = pageSlice.map((message) => ({
-      id: message.id,
-      data_creare: message.data_creare,
-      creation_date: message.creation_date,
-      cif_emitent: message.cif_emitent,
-      cif_beneficiar: message.cif_beneficiar,
-      cif: message.cif,
-      tip: message.tip,
-      detalii: message.detalii,
-      suma: message.suma,
-      currency: message.currency,
-    }));
-
-    if (totalRecords === 0) {
-      return {
-        cod: 200,
-        message: `Nu exista mesaje in intervalul ${startTimeMs} - ${endTimeMs}`,
-        mesaje: [],
-        numar_inregistrari_in_pagina: 0,
-        numar_total_inregistrari_per_pagina: pageSize,
-        numar_total_inregistrari: 0,
-        numar_total_pagini: 0,
-        index_pagina_curenta: currentPage,
-      };
-    }
-
     return {
-      cod: 200,
-      message: 'SUCCESS',
-      mesaje,
-      numar_inregistrari_in_pagina: mesaje.length,
-      numar_total_inregistrari_per_pagina: pageSize,
-      numar_total_inregistrari: totalRecords,
-      numar_total_pagini: totalPages,
-      index_pagina_curenta: currentPage,
+      messages: pageSlice,
+      totalRecords,
+      totalPages,
+      currentPage,
+      pageSize,
     };
   }
 
@@ -461,6 +429,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       cif_emitent: supplier.numericCui,
       cif_beneficiar: customer.numericCui,
       cif: supplier.numericCui,
+      id_solicitare: messageId,
       tip: 'FACTURA PRIMITA',
       detalii: `Factura de la ${supplier.name} catre ${customer.name}`,
       suma: amount,
@@ -712,6 +681,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       cif_emitent: supplier.numericCui,
       cif_beneficiar: customer.numericCui,
       cif: supplier.numericCui,
+      id_solicitare: messageId,
       tip: template.tip,
       detalii: `${template.lineDescription} | ${supplier.name} -> ${customer.name}`,
       suma: template.amount,

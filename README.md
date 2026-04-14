@@ -7,11 +7,11 @@ This service is designed for local development and CI environments where you wan
 ## Features
 
 - **Full OAuth2 Flow:** Authorization Code grant flow, Token exchange, and Refresh support.
-- **e-Factura Simulation:** Message list polling (`listaMesajeFactura`) and ZIP generation (`descarcare`) with valid UBL 2.1 XML.
+- **e-Factura Simulation:** 100% OpenAPI compliant implementations of `/upload`, `/uploadb2c`, `/stareMesaj`, `/listaMesajeFactura`, `/listaMesajePaginatieFactura`, and `/descarcare`.
+- **ANAF-Specific Rate Limiting:** Enforces official daily quotas (e.g., 1000 RASP/day, 100,000 paginated list queries/day) with exact ANAF error messages.
+- **Strict Validation:** Replicates ANAF's unique HTTP 200 XML/JSON error responses for file sizes (>10MB), invalid timestamps (60-day limits), and missing parameters.
 - **VAT Registry Simulation:** Mock VAT lookup (v9 standard) with deterministic company data.
 - **Developer Portal UI:** Built-in dashboard at `/console` for app registration and identity management.
-- **Fault Injection:** Configurable latency, random 500/504 errors, and 429 rate-limiting modes.
-- **Traffic Generation:** Background cron tasks to simulate active SPV inboxes.
 - **Flexible Storage:** In-memory state by default, or Redis-backed for persistent simulation across restarts.
 
 ---

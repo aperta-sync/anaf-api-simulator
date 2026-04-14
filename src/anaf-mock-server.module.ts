@@ -32,6 +32,9 @@ import { VatQueryHttpController } from './simulation/vat/queries/vat.query.http.
 import { UPLOAD_TRACKING_STORE } from './simulation/application/ports/upload-tracking-store.port';
 import { UploadTrackingStoreService } from './simulation/infrastructure/persistence/upload-tracking-store.service';
 import { RedisUploadTrackingStoreService } from './simulation/infrastructure/persistence/redis-upload-tracking-store.service';
+import { ANAF_RATE_LIMIT_STORE } from './simulation/application/ports/anaf-rate-limit-store.port';
+import { AnafRateLimitStoreService } from './simulation/infrastructure/persistence/anaf-rate-limit-store.service';
+import { AnafRateLimitService } from './simulation/application/services/anaf-rate-limit.service';
 
 @Module({
   imports: [CqrsModule, ScheduleModule.forRoot()],
@@ -78,6 +81,12 @@ import { RedisUploadTrackingStoreService } from './simulation/infrastructure/per
         return mode === 'redis' ? redisStore : inMemoryStore;
       },
       inject: [UploadTrackingStoreService, RedisUploadTrackingStoreService],
+    },
+    AnafRateLimitStoreService,
+    AnafRateLimitService,
+    {
+      provide: ANAF_RATE_LIMIT_STORE,
+      useExisting: AnafRateLimitStoreService,
     },
     UblGeneratorService,
     ZipArchiveService,

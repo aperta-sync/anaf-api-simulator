@@ -358,14 +358,14 @@ describe('AnafMockServer (e2e)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
 
-    const suppliers = new Set<string>(
+    const issuers = new Set<string>(
       response.body.mesaje.map(
-        (entry: { cif_emitent: string }) => entry.cif_emitent,
+        (entry: { cif: string }) => entry.cif,
       ),
     );
 
     expect(response.body.mesaje.length).toBeGreaterThan(0);
-    expect([...suppliers].some((supplier) => supplier !== '10237579')).toBe(
+    expect([...issuers].some((issuer) => issuer !== '10237579')).toBe(
       true,
     );
   });
@@ -402,8 +402,10 @@ describe('AnafMockServer (e2e)', () => {
     expect(issueDateMatch).toBeTruthy();
 
     const issueDate = issueDateMatch![1];
+    // data_creare is now YYYYMMDDHHmm format (e.g., "202604101000")
+    const dc = message.data_creare;
     const uploadDay = new Date(
-      `${message.data_creare.slice(0, 10)}T00:00:00.000Z`,
+      `${dc.slice(0, 4)}-${dc.slice(4, 6)}-${dc.slice(6, 8)}T00:00:00.000Z`,
     );
     const issueDay = new Date(`${issueDate}T00:00:00.000Z`);
     const driftDays = Math.round(
@@ -550,12 +552,16 @@ describe('AnafMockServer (e2e)', () => {
     expect(entries).toContain('semnatura.xml');
   });
 
-  it('rejects upload without valid bearer token', async () => {
-    await request(app.getHttpServer())
+  it('returns ANAF XML error for upload without valid bearer token', async () => {
+    const response = await request(app.getHttpServer())
       .post('/prod/FCTEL/rest/upload?standard=UBL&cif=RO10000008')
       .set('Content-Type', 'text/plain')
       .send('<Invoice/>')
-      .expect(401);
+      .expect(200);
+
+    expect(response.headers['content-type']).toContain('application/xml');
+    expect(response.text).toContain('ExecutionStatus="1"');
+    expect(response.text).toContain('Nu exista niciun CIF pentru care sa aveti drept in SPV');
   });
 
   it('returns upload error XML when x-simulate-upload-error header is set', async () => {
@@ -571,13 +577,14 @@ describe('AnafMockServer (e2e)', () => {
     expect(response.text).toContain('errorMessage=');
   });
 
-  it('returns 404 XML for unknown upload index in stareMesaj', async () => {
+  it('returns ANAF XML error for unknown upload index in stareMesaj', async () => {
     const response = await request(app.getHttpServer())
       .get('/prod/FCTEL/rest/stareMesaj?id_incarcare=99999999999')
       .set('Authorization', `Bearer ${accessToken}`)
-      .expect(404);
+      .expect(200);
 
-    expect(response.text).toContain('stare="in prelucrare"');
+    expect(response.headers['content-type']).toContain('application/xml');
+    expect(response.text).toContain('Nu exista factura cu id_incarcare= 99999999999');
   });
 
   it('returns paginated message list with ANAF pagination fields', async () => {
@@ -596,12 +603,15 @@ describe('AnafMockServer (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    expect(response.body.cod).toBe(200);
+    expect(response.body).toHaveProperty('serial');
+    expect(response.body).toHaveProperty('cui');
+    expect(response.body).toHaveProperty('titlu');
     expect(response.body).toHaveProperty('numar_total_inregistrari');
     expect(response.body).toHaveProperty('numar_total_pagini');
     expect(response.body).toHaveProperty('index_pagina_curenta');
     expect(response.body).toHaveProperty('numar_inregistrari_in_pagina');
     expect(response.body).toHaveProperty('numar_total_inregistrari_per_pagina');
+    expect(response.body.numar_total_inregistrari_per_pagina).toBe(500);
     expect(response.body.index_pagina_curenta).toBe(1);
     expect(Array.isArray(response.body.mesaje)).toBe(true);
   });

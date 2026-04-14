@@ -17,6 +17,37 @@ import {
 import { UploadEfacturaInvoiceCommand } from './messages.commands';
 
 /**
+ * Formats a Date (or ISO string) into ANAF's YYYYMMDDHHmm format.
+ */
+function formatAnafDataCreare(dateInput: string | Date): string {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}` +
+    `${pad(d.getMonth() + 1)}` +
+    `${pad(d.getDate())}` +
+    `${pad(d.getHours())}` +
+    `${pad(d.getMinutes())}`
+  );
+}
+
+/**
+ * Maps an internal StoredInvoiceMessage to the ANAF-spec compliant entry shape.
+ */
+function toAnafEntry(
+  message: SimulationTypes.StoredInvoiceMessage,
+): SimulationTypes.AnafMessageEntry {
+  return {
+    data_creare: formatAnafDataCreare(message.data_creare),
+    cif: message.cif,
+    id_solicitare: message.id_solicitare,
+    detalii: message.detalii,
+    tip: message.tip,
+    id: message.id,
+  };
+}
+
+/**
  * Handles list retrieval for e-Factura messages.
  */
 @QueryHandler(ListEfacturaMessagesQuery)
@@ -40,16 +71,17 @@ export class ListEfacturaMessagesHandler implements IQueryHandler<
   async execute(
     query: ListEfacturaMessagesQuery,
   ): Promise<SimulationTypes.MessageListResponse> {
-    const mesaje = await this.trafficGenerator.listMessages(
+    const messages = await this.trafficGenerator.listMessages(
       query.cif,
       query.zile,
       query.filtru,
     );
 
     return {
-      cod: 200,
-      message: 'SUCCESS',
-      mesaje,
+      mesaje: messages.map(toAnafEntry),
+      serial: '1234AA456',
+      cui: query.cif,
+      titlu: `Lista Mesaje disponibile din ultimele ${query.zile} zile`,
     };
   }
 }
@@ -270,13 +302,31 @@ export class ListMessagesPaginatedHandler implements IQueryHandler<
   async execute(
     query: ListMessagesPaginatedQuery,
   ): Promise<SimulationTypes.MessageListPaginationResponse> {
-    return this.trafficGenerator.listMessagesPaginated(
+    const result = await this.trafficGenerator.listMessagesPaginated(
       query.cif,
       query.startTime,
       query.endTime,
       query.pagina,
       query.filtru,
     );
+
+    const startDate = new Date(query.startTime);
+    const endDate = new Date(query.endTime);
+    const formatDate = (d: Date) =>
+      `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ` +
+      `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+
+    return {
+      mesaje: result.messages.map(toAnafEntry),
+      serial: '1234AA456',
+      cui: query.cif,
+      titlu: `Lista Mesaje disponibile din intervalul ${formatDate(startDate)} - ${formatDate(endDate)}`,
+      numar_inregistrari_in_pagina: result.messages.length,
+      numar_total_inregistrari_per_pagina: result.pageSize,
+      numar_total_inregistrari: result.totalRecords,
+      numar_total_pagini: result.totalPages,
+      index_pagina_curenta: result.currentPage,
+    };
   }
 }
 

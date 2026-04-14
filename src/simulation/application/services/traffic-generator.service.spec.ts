@@ -45,6 +45,7 @@ function buildStoredMessage(
     cif_emitent: supplier.numericCui,
     cif_beneficiar: customer.numericCui,
     cif: supplier.numericCui,
+    id_solicitare: id,
     tip,
     detalii: `Factura de la ${supplier.name} catre ${customer.name}`,
     suma: amount,
@@ -279,13 +280,10 @@ describe('TrafficGeneratorService', () => {
         'P',
       );
 
-      expect(result.cod).toBe(200);
-      expect(result.message).toBe('SUCCESS');
-      expect(result.numar_total_inregistrari).toBe(2);
-      expect(result.numar_total_pagini).toBe(1);
-      expect(result.index_pagina_curenta).toBe(1);
-      expect(result.numar_inregistrari_in_pagina).toBe(2);
-      expect(result.mesaje).toHaveLength(2);
+      expect(result.totalRecords).toBe(2);
+      expect(result.totalPages).toBe(1);
+      expect(result.currentPage).toBe(1);
+      expect(result.messages).toHaveLength(2);
     });
 
     it('filters by time range', async () => {
@@ -311,8 +309,8 @@ describe('TrafficGeneratorService', () => {
         'P',
       );
 
-      expect(result.numar_total_inregistrari).toBe(1);
-      expect(result.mesaje[0]?.id).toBe('TR-IN');
+      expect(result.totalRecords).toBe(1);
+      expect(result.messages[0]?.id).toBe('TR-IN');
     });
 
     it('returns empty result with descriptive message when no messages match', async () => {
@@ -326,11 +324,9 @@ describe('TrafficGeneratorService', () => {
         'P',
       );
 
-      expect(result.cod).toBe(200);
-      expect(result.message).toContain('Nu exista mesaje');
-      expect(result.mesaje).toHaveLength(0);
-      expect(result.numar_total_inregistrari).toBe(0);
-      expect(result.numar_total_pagini).toBe(0);
+      expect(result.messages).toHaveLength(0);
+      expect(result.totalRecords).toBe(0);
+      expect(result.totalPages).toBe(1);
     });
   });
 });

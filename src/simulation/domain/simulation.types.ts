@@ -124,16 +124,36 @@ export namespace SimulationTypes {
     cif_emitent: string;
     cif_beneficiar: string;
     cif: string;
+    id_solicitare: string;
     tip: string;
     detalii: string;
     suma: number;
     currency: string;
   }
 
+  /**
+   * ANAF-compliant message entry as returned to clients.
+   * Only fields defined in the official Swagger spec.
+   */
+  export interface AnafMessageEntry {
+    data_creare: string;
+    cif: string;
+    id_solicitare: string;
+    detalii: string;
+    tip: string;
+    id: string;
+  }
+
   export interface MessageListResponse {
-    cod: number;
-    message: string;
-    mesaje: MessageListEntry[];
+    mesaje: AnafMessageEntry[];
+    serial: string;
+    cui: string;
+    titlu: string;
+  }
+
+  export interface MessageListErrorResponse {
+    eroare: string;
+    titlu: string;
   }
 
   export type UploadStandard = 'UBL' | 'CII' | 'CN' | 'RASP';
@@ -162,6 +182,11 @@ export namespace SimulationTypes {
     numar_total_inregistrari: number;
     numar_total_pagini: number;
     index_pagina_curenta: number;
+  }
+
+  export interface DescarcareErrorResponse {
+    eroare: string;
+    titlu: string;
   }
 
   export interface StoredInvoiceMessage extends MessageListEntry {
