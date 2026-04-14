@@ -72,6 +72,18 @@ node scripts/anaf-scraper.mjs
 ```
 
 
+### Simulating Edge Cases (Cheat Headers)
+
+You can trigger specific ANAF error responses by sending custom HTTP headers with your requests. This is useful for testing your application's error-handling logic.
+
+| Header | Value | Description |
+| :--- | :--- | :--- |
+| `X-Simulate-Upload-Error` | `true` | Returns a generic upload validation error XML. |
+| `X-Simulate-Xml-Validation` | `true` | Returns a SAXParseException (invalid XML) error XML. |
+| `X-Simulate-No-Spv` | `true` | Returns "Nu exista niciun CIF pentru care sa aveti drept in SPV". |
+| `X-Simulate-Wrong-Certificate` | `true` | Returns an `ANAF_CUI_MISMATCH` 403 error. |
+| `X-Simulate-Technical-Error` | `true` | Returns a "Cod: SIM-001" technical error XML. |
+
 ---
 
 ## Configuration Reference
