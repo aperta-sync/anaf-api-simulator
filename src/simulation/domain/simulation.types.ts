@@ -44,6 +44,7 @@ export namespace SimulationTypes {
 
   export interface SimulationConfig {
     latencyMs: number;
+    processingDelayMs: number;
     errorRate: number;
     rateLimitMode: RateLimitMode;
     rateLimitWindowMs: number;
@@ -123,16 +124,69 @@ export namespace SimulationTypes {
     cif_emitent: string;
     cif_beneficiar: string;
     cif: string;
+    id_solicitare: string;
     tip: string;
     detalii: string;
     suma: number;
     currency: string;
   }
 
+  /**
+   * ANAF-compliant message entry as returned to clients.
+   * Only fields defined in the official Swagger spec.
+   */
+  export interface AnafMessageEntry {
+    data_creare: string;
+    cif: string;
+    id_solicitare: string;
+    detalii: string;
+    tip: string;
+    id: string;
+  }
+
   export interface MessageListResponse {
-    cod: number;
-    message: string;
-    mesaje: MessageListEntry[];
+    mesaje: AnafMessageEntry[];
+    serial: string;
+    cui: string;
+    titlu: string;
+  }
+
+  export interface MessageListErrorResponse {
+    eroare: string;
+    titlu: string;
+  }
+
+  export type UploadStandard = 'UBL' | 'CII' | 'CN' | 'RASP';
+
+  export type UploadStatus =
+    | 'in prelucrare'
+    | 'ok'
+    | 'nok'
+    | 'XML cu erori nepreluat de sistem';
+
+  export interface UploadedInvoiceRecord {
+    indexIncarcare: string;
+    cif: string;
+    standard: UploadStandard;
+    xmlContent: string;
+    uploadedAt: Date;
+    processingCompleteAt: Date;
+    messageId: string | null;
+    status: UploadStatus;
+    errors: string[];
+  }
+
+  export interface MessageListPaginationResponse extends MessageListResponse {
+    numar_inregistrari_in_pagina: number;
+    numar_total_inregistrari_per_pagina: number;
+    numar_total_inregistrari: number;
+    numar_total_pagini: number;
+    index_pagina_curenta: number;
+  }
+
+  export interface DescarcareErrorResponse {
+    eroare: string;
+    titlu: string;
   }
 
   export interface StoredInvoiceMessage extends MessageListEntry {

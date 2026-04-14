@@ -7,11 +7,13 @@ This service is designed for local development and CI environments where you wan
 ## Features
 
 - **Full OAuth2 Flow:** Authorization Code grant flow, Token exchange, and Refresh support.
-- **e-Factura Simulation:** Message list polling (`listaMesajeFactura`) and ZIP generation (`descarcare`) with valid UBL 2.1 XML.
+- **e-Factura Simulation:** 100% OpenAPI compliant implementations of `/upload`, `/uploadb2c`, `/stareMesaj`, `/listaMesajeFactura`, `/listaMesajePaginatieFactura`, and `/descarcare`.
+- **ANAF-Specific Rate Limiting:** Enforces official daily quotas (e.g., 1000 RASP/day, 100,000 paginated list queries/day) with exact ANAF error messages.
+- **Strict Validation:** Replicates ANAF's unique HTTP 200 XML/JSON error responses for file sizes (>10MB), invalid timestamps (60-day limits), and missing parameters.
+- **Fault Injection:** Configurable latency, random 500/504 errors, and generic 429 rate-limiting modes for edge-case testing.
+- **Traffic Generation:** Background tasks to simulate active SPV inboxes with realistic inter-company invoice flow.
 - **VAT Registry Simulation:** Mock VAT lookup (v9 standard) with deterministic company data.
 - **Developer Portal UI:** Built-in dashboard at `/console` for app registration and identity management.
-- **Fault Injection:** Configurable latency, random 500/504 errors, and 429 rate-limiting modes.
-- **Traffic Generation:** Background cron tasks to simulate active SPV inboxes.
 - **Flexible Storage:** In-memory state by default, or Redis-backed for persistent simulation across restarts.
 
 ---
@@ -50,6 +52,37 @@ The project includes a multi-stage **lightweight Dockerfile** (Alpine-based) opt
      -e ANAF_MOCK_STRICT_OWNERSHIP=true \
      anaf-mock-server:latest
    ```
+
+## Documentation
+
+The project maintains a high-fidelity sync with official ANAF documentation.
+
+- **[Official Docs](docs/anaf/official/)**: Original PDFs and registration procedures.
+- **[Manual Guides](docs/anaf/manual/)**: Human-readable summaries of API endpoints and OAuth2 registration.
+- **[Scraped Assets](docs/anaf/scraped/)**:
+  - **Swagger JSONs**: `docs/anaf/scraped/technical/swagger/` contains automated OpenAPI extractions.
+  - **Technical Specs**: `docs/anaf/scraped/technical/` contains raw HTML and text limit files.
+
+### CI/CD Documentation Parity
+Our GitHub Action `Check ANAF Documentation Parity` ensures the codebase stays in sync. If ANAF updates their documentation, the pipeline will fail, alerting us to update the mock server.
+
+To update the scraped documentation locally, run:
+```bash
+node scripts/anaf-scraper.mjs
+```
+
+
+### Simulating Edge Cases (Cheat Headers)
+
+You can trigger specific ANAF error responses by sending custom HTTP headers with your requests. This is useful for testing your application's error-handling logic.
+
+| Header | Value | Description |
+| :--- | :--- | :--- |
+| `X-Simulate-Upload-Error` | `true` | Returns a generic upload validation error XML. |
+| `X-Simulate-Xml-Validation` | `true` | Returns a SAXParseException (invalid XML) error XML. |
+| `X-Simulate-No-Spv` | `true` | Returns "Nu exista niciun CIF pentru care sa aveti drept in SPV". |
+| `X-Simulate-Wrong-Certificate` | `true` | Returns an `ANAF_CUI_MISMATCH` 403 error. |
+| `X-Simulate-Technical-Error` | `true` | Returns a "Cod: SIM-001" technical error XML. |
 
 ---
 

@@ -61,6 +61,7 @@ describe('AnafMockServer (e2e)', () => {
       autoGenerateTraffic: false,
       strictVatLookup: false,
       strictOwnershipValidation: true,
+      processingDelayMs: 0,
     });
 
     await request(app.getHttpServer())
@@ -357,14 +358,14 @@ describe('AnafMockServer (e2e)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
 
-    const suppliers = new Set<string>(
+    const issuers = new Set<string>(
       response.body.mesaje.map(
-        (entry: { cif_emitent: string }) => entry.cif_emitent,
+        (entry: { cif: string }) => entry.cif,
       ),
     );
 
     expect(response.body.mesaje.length).toBeGreaterThan(0);
-    expect([...suppliers].some((supplier) => supplier !== '10237579')).toBe(
+    expect([...issuers].some((issuer) => issuer !== '10237579')).toBe(
       true,
     );
   });
@@ -401,8 +402,10 @@ describe('AnafMockServer (e2e)', () => {
     expect(issueDateMatch).toBeTruthy();
 
     const issueDate = issueDateMatch![1];
+    // data_creare is now YYYYMMDDHHmm format (e.g., "202604101000")
+    const dc = message.data_creare;
     const uploadDay = new Date(
-      `${message.data_creare.slice(0, 10)}T00:00:00.000Z`,
+      `${dc.slice(0, 4)}-${dc.slice(4, 6)}-${dc.slice(6, 8)}T00:00:00.000Z`,
     );
     const issueDay = new Date(`${issueDate}T00:00:00.000Z`);
     const driftDays = Math.round(
@@ -421,22 +424,21 @@ describe('AnafMockServer (e2e)', () => {
       rateLimitTrigger: true,
     });
 
-    const cfg = await request(app.getHttpServer())
-      .get('/simulation/config')
-      .expect(200);
-    const requestCount = cfg.body.requestCount as number;
-    const remainder = requestCount % 5;
-    const callsUntilRateLimit = remainder === 0 ? 5 : 5 - remainder;
-
-    let lastStatus = 200;
-    for (let index = 0; index < callsUntilRateLimit; index += 1) {
+    let found429 = false;
+    // Since it triggers every 5th request globally, making 6 requests guarantees we hit it at least once
+    // regardless of the initial requestCount value.
+    for (let index = 0; index < 6; index += 1) {
       const response = await request(app.getHttpServer())
         .get('/prod/FCTEL/rest/listaMesajeFactura?cif=RO10000008&zile=7')
         .set('Authorization', `Bearer ${accessToken}`);
-      lastStatus = response.status;
+      
+      if (response.status === 429) {
+        found429 = true;
+        break;
+      }
     }
 
-    expect(lastStatus).toBe(429);
+    expect(found429).toBe(true);
 
     await updateConfig({
       latencyMs: 0,
@@ -495,6 +497,146 @@ describe('AnafMockServer (e2e)', () => {
     });
   });
 
+  it('completes full upload lifecycle: upload → stareMesaj → descarcare', async () => {
+    const invoiceXml = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">',
+      '  <cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">TEST-001</cbc:ID>',
+      '</Invoice>',
+    ].join('\n');
+
+    // Step 1: Upload
+    const uploadResponse = await request(app.getHttpServer())
+      .post('/prod/FCTEL/rest/upload?standard=UBL&cif=RO10000008')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Content-Type', 'text/plain')
+      .send(invoiceXml)
+      .expect(200);
+
+    expect(uploadResponse.headers['content-type']).toContain('application/xml');
+    expect(uploadResponse.text).toContain('ExecutionStatus="0"');
+    expect(uploadResponse.text).toContain('index_incarcare=');
+
+    const indexMatch = uploadResponse.text.match(/index_incarcare="(\d+)"/);
+    expect(indexMatch).toBeTruthy();
+    const indexIncarcare = indexMatch![1];
+
+    // Step 2: Check status (processingDelayMs=0, should be "ok" immediately)
+    const statusResponse = await request(app.getHttpServer())
+      .get(`/prod/FCTEL/rest/stareMesaj?id_incarcare=${indexIncarcare}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(statusResponse.headers['content-type']).toContain('application/xml');
+    expect(statusResponse.text).toContain('stare="ok"');
+    expect(statusResponse.text).toContain('id_descarcare=');
+
+    const idDescarcareMatch = statusResponse.text.match(/id_descarcare="([^"]+)"/);
+    expect(idDescarcareMatch).toBeTruthy();
+    const idDescarcare = idDescarcareMatch![1];
+
+    // Step 3: Download the processed invoice
+    const downloadResponse = await request(app.getHttpServer())
+      .get(`/prod/FCTEL/rest/descarcare?id=${encodeURIComponent(idDescarcare)}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .buffer(true)
+      .parse(binaryParser)
+      .expect(200);
+
+    expect(downloadResponse.headers['content-type']).toContain('application/zip');
+
+    const zip = new AdmZip(downloadResponse.body as Buffer);
+    const entries = zip.getEntries().map((entry) => entry.entryName);
+    expect(entries).toContain('factura.xml');
+    expect(entries).toContain('semnatura.xml');
+  });
+
+  it('returns ANAF XML error for upload without valid bearer token', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/prod/FCTEL/rest/upload?standard=UBL&cif=RO10000008')
+      .set('Content-Type', 'text/plain')
+      .send('<Invoice/>')
+      .expect(200);
+
+    expect(response.headers['content-type']).toContain('application/xml');
+    expect(response.text).toContain('ExecutionStatus="1"');
+    expect(response.text).toContain('Nu exista niciun CIF pentru care sa aveti drept in SPV');
+  });
+
+  it('returns upload error XML when x-simulate-upload-error header is set', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/prod/FCTEL/rest/upload?standard=UBL&cif=RO10000008')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Content-Type', 'text/plain')
+      .set('X-Simulate-Upload-Error', 'true')
+      .send('<Invoice/>')
+      .expect(200);
+
+    expect(response.text).toContain('ExecutionStatus="1"');
+    expect(response.text).toContain('errorMessage=');
+  });
+
+  it('returns ANAF XML error for unknown upload index in stareMesaj', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/prod/FCTEL/rest/stareMesaj?id_incarcare=99999999999')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(response.headers['content-type']).toContain('application/xml');
+    expect(response.text).toContain('Nu exista factura cu id_incarcare= 99999999999');
+  });
+
+  it('returns paginated message list with ANAF pagination fields', async () => {
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+    const response = await request(app.getHttpServer())
+      .get('/prod/FCTEL/rest/listaMesajePaginatieFactura')
+      .query({
+        cif: 'RO10000008',
+        startTime: String(thirtyDaysAgo),
+        endTime: String(now),
+        pagina: '1',
+        filtru: 'P',
+      })
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(response.body).toHaveProperty('serial');
+    expect(response.body).toHaveProperty('cui');
+    expect(response.body).toHaveProperty('titlu');
+    expect(response.body).toHaveProperty('numar_total_inregistrari');
+    expect(response.body).toHaveProperty('numar_total_pagini');
+    expect(response.body).toHaveProperty('index_pagina_curenta');
+    expect(response.body).toHaveProperty('numar_inregistrari_in_pagina');
+    expect(response.body).toHaveProperty('numar_total_inregistrari_per_pagina');
+    expect(response.body.numar_total_inregistrari_per_pagina).toBe(500);
+    expect(response.body.index_pagina_curenta).toBe(1);
+    expect(Array.isArray(response.body.mesaje)).toBe(true);
+  });
+
+  it('simulates XML validation failure via x-simulate-invalid-xml header', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/prod/FCTEL/rest/stareMesaj?id_incarcare=12345')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('X-Simulate-Invalid-Xml', 'true')
+      .expect(200);
+
+    expect(response.text).toContain('stare="XML cu erori nepreluat de sistem"');
+    expect(response.text).toContain('errorMessage=');
+  });
+
+  it('simulates nok status via x-simulate-nok header', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/prod/FCTEL/rest/stareMesaj?id_incarcare=12345')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('X-Simulate-Nok', 'true')
+      .expect(200);
+
+    expect(response.text).toContain('stare="nok"');
+    expect(response.text).toContain('errorMessage=');
+  });
+
   /**
    * Executes updateConfig.
    * @param config Value for config.
@@ -510,6 +652,7 @@ describe('AnafMockServer (e2e)', () => {
     trafficProbability?: number;
     strictVatLookup?: boolean;
     strictOwnershipValidation?: boolean;
+    processingDelayMs?: number;
   }): Promise<void> {
     await request(app.getHttpServer())
       .patch('/simulation/config')

@@ -1,6 +1,10 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Inject, Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import { SimulationEngineService } from '../../application/services/simulation-engine.service';
+import {
+  ANAF_RATE_LIMIT_STORE,
+  AnafRateLimitStorePort,
+} from '../../application/ports/anaf-rate-limit-store.port';
 
 /**
  * Injects latency, transient faults and rate limiting into simulated API routes.
@@ -11,7 +15,13 @@ export class FaultInjectorMiddleware implements NestMiddleware {
    * Creates an instance of FaultInjectorMiddleware.
    * @param simulationEngine Value for simulationEngine.
    */
-  constructor(private readonly simulationEngine: SimulationEngineService) {}
+  private readonly globalMinuteCounters = new Map<string, { count: number; resetAt: number }>();
+
+  constructor(
+    private readonly simulationEngine: SimulationEngineService,
+    @Inject(ANAF_RATE_LIMIT_STORE)
+    private readonly rateLimitStore: AnafRateLimitStorePort,
+  ) {}
 
   /**
    * Applies fault-injection rules for eligible requests.
@@ -43,6 +53,16 @@ export class FaultInjectorMiddleware implements NestMiddleware {
     const isRateLimitedEndpoint =
       req.path.includes('/FCTEL/rest/') ||
       req.path.includes('/PlatitorTvaRest/');
+
+    // ANAF global limit: max 1000 calls/minute across all methods
+    if (isRateLimitedEndpoint && this.isGlobalMinuteLimitExceeded()) {
+      res.status(429).json({
+        cod: 429,
+        message: 'Limita de 1000 apeluri/minut a fost depasita',
+        path: req.path,
+      });
+      return;
+    }
 
     const rateLimitMode = config.rateLimitMode;
 
@@ -119,6 +139,23 @@ export class FaultInjectorMiddleware implements NestMiddleware {
     }
 
     next();
+  }
+
+  /**
+   * Checks global 1000 calls/minute limit (ANAF spec).
+   */
+  private isGlobalMinuteLimitExceeded(): boolean {
+    const key = 'global';
+    const now = Date.now();
+    const entry = this.globalMinuteCounters.get(key);
+
+    if (!entry || now >= entry.resetAt) {
+      this.globalMinuteCounters.set(key, { count: 1, resetAt: now + 60_000 });
+      return false;
+    }
+
+    entry.count += 1;
+    return entry.count > 1000;
   }
 
   /**

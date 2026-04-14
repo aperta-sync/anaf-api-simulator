@@ -35,3 +35,23 @@ export interface EfacturaArchiveResult {
   message: SimulationTypes.StoredInvoiceMessage;
   archive: Buffer;
 }
+
+/**
+ * Retrieves the processing status of an uploaded invoice.
+ */
+export class GetUploadStatusQuery {
+  constructor(public readonly idIncarcare: string) {}
+}
+
+/**
+ * Requests paginated e-Factura messages for a CUI within a time range.
+ */
+export class ListMessagesPaginatedQuery {
+  constructor(
+    public readonly cif: string,
+    public readonly startTime: number,
+    public readonly endTime: number,
+    public readonly pagina: number,
+    public readonly filtru?: string,
+  ) {}
+}

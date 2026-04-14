@@ -443,6 +443,12 @@ export class SimulationEngineService implements OnModuleInit {
         Math.floor(update.latencyMs),
       );
     }
+    if (typeof update.processingDelayMs === 'number') {
+      this.simulationConfig.processingDelayMs = Math.max(
+        0,
+        Math.floor(update.processingDelayMs),
+      );
+    }
     if (typeof update.errorRate === 'number') {
       this.simulationConfig.errorRate = Math.min(
         100,
@@ -504,6 +510,7 @@ export class SimulationEngineService implements OnModuleInit {
   private buildDefaultConfig(): SimulationTypes.SimulationConfig {
     return {
       latencyMs: Number(process.env.ANAF_MOCK_LATENCY_MS ?? 200),
+      processingDelayMs: Number(process.env.ANAF_MOCK_PROCESSING_DELAY_MS ?? 3000),
       errorRate: Number(process.env.ANAF_MOCK_ERROR_RATE ?? 0),
       rateLimitMode: (process.env.ANAF_MOCK_RATE_LIMIT_MODE ?? 'off') as any,
       rateLimitWindowMs: Number(

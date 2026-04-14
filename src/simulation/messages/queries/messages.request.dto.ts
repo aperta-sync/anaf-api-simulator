@@ -1,50 +1,62 @@
-import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 /**
- * Data transfer object for ListaMesajeFacturaQueryDto.
+ * Query DTO for /listaMesajeFactura.
  *
- * @remarks Used by: src/simulation/dto/message-endpoints.dto.ts, src/simulation/messages/queries/messages.query.http.controller.ts.
+ * Validation is intentionally relaxed — ANAF returns JSON 200 errors with
+ * `{eroare, titlu}` for non-numeric values, out-of-range zile, and invalid
+ * filtru.  The controller performs those checks.
  */
 export class ListaMesajeFacturaQueryDto {
-  /**
-   * The cif value.
-   */
+  @IsOptional()
   @IsString()
-  cif!: string;
+  cif?: string;
 
-  /**
-   * The zile value.
-   */
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(60)
-  zile?: number;
+  @IsString()
+  zile?: string;
 
-  /**
-   * The filtru value.
-   */
   @IsOptional()
-  @Type(() => String)
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim().toUpperCase() : value,
-  )
-  @IsIn(['P', 'T', 'E', 'R'])
   @IsString()
   filtru?: string;
 }
 
-/**
- * Data transfer object for DescarcareQueryDto.
- *
- * @remarks Used by: src/simulation/dto/message-endpoints.dto.ts, src/simulation/messages/queries/messages.query.http.controller.ts.
- */
 export class DescarcareQueryDto {
-  /**
-   * The id value.
-   */
+  @IsOptional()
   @IsString()
-  id!: string;
+  id?: string;
+}
+
+export class StareMesajQueryDto {
+  @IsOptional()
+  @IsString()
+  id_incarcare?: string;
+}
+
+/**
+ * Query DTO for /listaMesajePaginatieFactura.
+ *
+ * All parameters are received as raw strings so the controller can return
+ * ANAF-spec error shapes for non-numeric or missing values.
+ */
+export class ListaMesajePaginatieFacturaQueryDto {
+  @IsOptional()
+  @IsString()
+  cif?: string;
+
+  @IsOptional()
+  @IsString()
+  startTime?: string;
+
+  @IsOptional()
+  @IsString()
+  endTime?: string;
+
+  @IsOptional()
+  @IsString()
+  pagina?: string;
+
+  @IsOptional()
+  @IsString()
+  filtru?: string;
 }

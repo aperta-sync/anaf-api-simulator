@@ -8,6 +8,14 @@ import { SimulationTypes } from '../../domain/simulation.types';
 
 type MessageFilter = 'P' | 'T' | 'E' | 'R';
 
+export interface PaginatedMessagesResult {
+  messages: SimulationTypes.StoredInvoiceMessage[];
+  totalRecords: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}
+
 interface SeedMessageTemplate {
   supplierCui: string;
   customerCui: string;
@@ -89,7 +97,7 @@ export class TrafficGeneratorService implements OnModuleInit {
     rawCui: string,
     zile: number,
     filtru?: string,
-  ): Promise<SimulationTypes.MessageListEntry[]> {
+  ): Promise<SimulationTypes.StoredInvoiceMessage[]> {
     const normalized = this.simulationEngine.normalizeCui(rawCui);
 
     // Keep optional synthetic traffic for backwards compatibility, disabled by default.
@@ -111,19 +119,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       )
       .sort(
         (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
-      )
-      .map((message) => ({
-        id: message.id,
-        data_creare: message.data_creare,
-        creation_date: message.creation_date,
-        cif_emitent: message.cif_emitent,
-        cif_beneficiar: message.cif_beneficiar,
-        cif: message.cif,
-        tip: message.tip,
-        detalii: message.detalii,
-        suma: message.suma,
-        currency: message.currency,
-      }));
+      );
   }
 
   /**
@@ -145,6 +141,44 @@ export class TrafficGeneratorService implements OnModuleInit {
    */
   async listAllMessages(): Promise<SimulationTypes.StoredInvoiceMessage[]> {
     return this.messageStore.listAll();
+  }
+
+  /**
+   * Creates and persists a StoredInvoiceMessage from an upload operation.
+   */
+  async createMessageFromUpload(
+    supplier: SimulationTypes.CompanyProfile,
+    customer: SimulationTypes.CompanyProfile,
+    amount: number,
+    xmlContent: string,
+  ): Promise<string> {
+    const messageId = await this.messageStore.allocateId();
+    const now = new Date();
+    const issueDate = new Date(now.getTime());
+    issueDate.setUTCDate(issueDate.getUTCDate() - (1 + Math.floor(Math.random() * 4)));
+
+    const message: SimulationTypes.StoredInvoiceMessage = {
+      id: messageId,
+      data_creare: now.toISOString(),
+      creation_date: now.toISOString(),
+      cif_emitent: supplier.numericCui,
+      cif_beneficiar: customer.numericCui,
+      cif: supplier.numericCui,
+      id_solicitare: messageId,
+      tip: 'FACTURA TRIMISA',
+      detalii: `Factura incarcata de ${supplier.name} catre ${customer.name}`,
+      suma: amount,
+      currency: 'RON',
+      issueDate: issueDate.toISOString().slice(0, 10),
+      payableAmount: amount,
+      supplier,
+      customer,
+      lineDescription: 'Factura incarcata prin upload',
+      createdAt: now,
+    };
+
+    await this.messageStore.save(message);
+    return messageId;
   }
 
   /**
@@ -280,6 +314,55 @@ export class TrafficGeneratorService implements OnModuleInit {
   }
 
   /**
+   * Lists messages with time-range filtering and pagination.
+   */
+  async listMessagesPaginated(
+    rawCui: string,
+    startTimeMs: number,
+    endTimeMs: number,
+    page: number,
+    filtru?: string,
+  ): Promise<PaginatedMessagesResult> {
+    const normalized = this.simulationEngine.normalizeCui(rawCui);
+    const filter = this.normalizeFilter(filtru);
+    const startThreshold = new Date(startTimeMs);
+    const endThreshold = new Date(endTimeMs);
+    const pageSize = 500;
+
+    const allMessages =
+      filter === 'P'
+        ? await this.messageStore.listForBeneficiary(normalized.numeric)
+        : await this.messageStore.listAll();
+
+    const filtered = allMessages
+      .filter(
+        (message) =>
+          message.createdAt >= startThreshold &&
+          message.createdAt <= endThreshold,
+      )
+      .filter((message) =>
+        this.matchesFilter(message, normalized.numeric, filter),
+      )
+      .sort(
+        (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+      );
+
+    const totalRecords = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const startIndex = (currentPage - 1) * pageSize;
+    const pageSlice = filtered.slice(startIndex, startIndex + pageSize);
+
+    return {
+      messages: pageSlice,
+      totalRecords,
+      totalPages,
+      currentPage,
+      pageSize,
+    };
+  }
+
+  /**
    * Adds optional synthetic near-real-time traffic for legacy scenarios.
    *
    * @param cifBeneficiar Beneficiary numeric CUI.
@@ -346,6 +429,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       cif_emitent: supplier.numericCui,
       cif_beneficiar: customer.numericCui,
       cif: supplier.numericCui,
+      id_solicitare: messageId,
       tip: 'FACTURA PRIMITA',
       detalii: `Factura de la ${supplier.name} catre ${customer.name}`,
       suma: amount,
@@ -597,6 +681,7 @@ export class TrafficGeneratorService implements OnModuleInit {
       cif_emitent: supplier.numericCui,
       cif_beneficiar: customer.numericCui,
       cif: supplier.numericCui,
+      id_solicitare: messageId,
       tip: template.tip,
       detalii: `${template.lineDescription} | ${supplier.name} -> ${customer.name}`,
       suma: template.amount,
