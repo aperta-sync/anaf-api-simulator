@@ -7,6 +7,15 @@ import {
   Res,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { UploadInvoiceQueryDto } from './upload-invoice.request.dto';
 import { UploadEfacturaInvoiceCommand } from '../../application/messages/messages.commands';
@@ -27,6 +36,8 @@ const VALID_STANDARDS = ['UBL', 'CII', 'CN', 'RASP'];
 /**
  * Handles e-Factura invoice upload command endpoints.
  */
+@ApiTags('e-Factura / Upload')
+@ApiBearerAuth('bearer')
 @Controller('prod/FCTEL/rest')
 export class MessagesCommandHttpController {
   constructor(
@@ -38,6 +49,26 @@ export class MessagesCommandHttpController {
   ) {}
 
   @Post('upload')
+  @ApiOperation({
+    summary: 'Upload e-Factura XML invoice (B2B)',
+    description:
+      'Accepts a UBL/CII/CN/RASP XML body and registers it as an e-invoice. ' +
+      'Returns an XML response with `ExecutionStatus="0"` (success) or `ExecutionStatus="1"` (error) — ' +
+      'always HTTP 200 except for an empty body (HTTP 400).\n\n' +
+      '**Production URL:** `POST https://api.anaf.ro/prod/FCTEL/rest/upload`',
+  })
+  @ApiQuery({ name: 'standard', description: 'Invoice XML standard. Accepted values: UBL, CII, CN, RASP', example: 'UBL' })
+  @ApiQuery({ name: 'cif', description: 'Fiscal identification code of the sender (numeric or RO-prefixed)', example: '1234567' })
+  @ApiQuery({ name: 'extern', required: false, description: 'Set to "DA" to mark the invoice as from an external (non-RO) counterpart' })
+  @ApiQuery({ name: 'autofactura', required: false, description: 'Set to "DA" for self-billed invoices' })
+  @ApiQuery({ name: 'executare', required: false, description: 'Set to "DA" for judicial enforcement invoices' })
+  @ApiBody({ description: 'Raw UBL / CII / CN / RASP XML content', schema: { type: 'string', format: 'binary' } })
+  @ApiHeader({ name: 'x-simulate-upload-error', required: false, description: 'Set to "true" to force a generic upload validation error (ExecutionStatus=1)' })
+  @ApiHeader({ name: 'x-simulate-technical-error', required: false, description: 'Set to "true" to force a technical server error response' })
+  @ApiHeader({ name: 'x-simulate-xml-validation-error', required: false, description: 'Set to "true" to simulate an XML schema validation failure (SAXParseException)' })
+  @ApiHeader({ name: 'x-simulate-executare-registry', required: false, description: 'Set to "true" to simulate CIF not registered in the judicial enforcement registry' })
+  @ApiResponse({ status: 200, description: 'XML response — ExecutionStatus="0" (success, includes index_incarcare) or ExecutionStatus="1" (error, includes error message)' })
+  @ApiResponse({ status: 400, description: 'Bad Request — empty request body (JSON)' })
   async upload(
     @Query() query: UploadInvoiceQueryDto,
     @Headers('authorization') authorizationHeader: string | undefined,
@@ -56,6 +87,25 @@ export class MessagesCommandHttpController {
   }
 
   @Post('uploadb2c')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Upload e-Factura XML invoice (B2C)',
+    description:
+      'Business-to-consumer variant of the upload endpoint. Identical validation rules and response shapes apply.\n\n' +
+      '**Production URL:** `POST https://api.anaf.ro/prod/FCTEL/rest/uploadb2c`',
+  })
+  @ApiQuery({ name: 'standard', description: 'Invoice XML standard. Accepted values: UBL, CII, CN, RASP', example: 'UBL' })
+  @ApiQuery({ name: 'cif', description: 'Fiscal identification code of the sender (numeric or RO-prefixed)', example: '1234567' })
+  @ApiQuery({ name: 'extern', required: false, description: 'Set to "DA" to mark the invoice as from an external (non-RO) counterpart' })
+  @ApiQuery({ name: 'autofactura', required: false, description: 'Set to "DA" for self-billed invoices' })
+  @ApiQuery({ name: 'executare', required: false, description: 'Set to "DA" for judicial enforcement invoices' })
+  @ApiBody({ description: 'Raw UBL / CII / CN / RASP XML content', schema: { type: 'string', format: 'binary' } })
+  @ApiHeader({ name: 'x-simulate-upload-error', required: false, description: 'Set to "true" to force a generic upload validation error (ExecutionStatus=1)' })
+  @ApiHeader({ name: 'x-simulate-technical-error', required: false, description: 'Set to "true" to force a technical server error response' })
+  @ApiHeader({ name: 'x-simulate-xml-validation-error', required: false, description: 'Set to "true" to simulate an XML schema validation failure (SAXParseException)' })
+  @ApiHeader({ name: 'x-simulate-executare-registry', required: false, description: 'Set to "true" to simulate CIF not registered in the judicial enforcement registry' })
+  @ApiResponse({ status: 200, description: 'XML response — ExecutionStatus="0" (success) or ExecutionStatus="1" (error)' })
+  @ApiResponse({ status: 400, description: 'Bad Request — empty request body (JSON)' })
   async uploadB2c(
     @Query() query: UploadInvoiceQueryDto,
     @Headers('authorization') authorizationHeader: string | undefined,

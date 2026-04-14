@@ -11,6 +11,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RegisterMockAppDto } from './register-mock-app.request.dto';
 import { UpdateMockAppDto } from './update-mock-app.request.dto';
 import {
@@ -24,6 +25,7 @@ import { SimulationTypes } from '../../domain/simulation.types';
 /**
  * Handles mutating developer portal API operations for mock applications.
  */
+@ApiTags('Developer Portal')
 @Controller('developer-portal/api/apps')
 export class DeveloperPortalCommandHttpController {
   /**
@@ -39,6 +41,8 @@ export class DeveloperPortalCommandHttpController {
    * @returns Newly issued client credentials and metadata.
    */
   @Post()
+  @ApiOperation({ summary: 'Register a new mock OAuth application' })
+  @ApiResponse({ status: 201, description: 'Created — returns clientId, clientSecret, redirectUris and metadata' })
   async registerFromApi(@Body() dto: RegisterMockAppDto) {
     const registered = await this.commandBus.execute(
       new RegisterMockApplicationCommand(
@@ -59,6 +63,10 @@ export class DeveloperPortalCommandHttpController {
    * @returns Updated application details.
    */
   @Patch(':clientId')
+  @ApiOperation({ summary: 'Update a mock application\'s name or redirect URIs' })
+  @ApiParam({ name: 'clientId', description: 'OAuth client identifier' })
+  @ApiResponse({ status: 200, description: 'Updated application details' })
+  @ApiResponse({ status: 404, description: 'Not Found — clientId does not exist' })
   async updateApplication(
     @Param('clientId') clientId: string,
     @Body() dto: UpdateMockAppDto,
@@ -97,6 +105,10 @@ export class DeveloperPortalCommandHttpController {
    */
   @Delete(':clientId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a mock application' })
+  @ApiParam({ name: 'clientId', description: 'OAuth client identifier' })
+  @ApiResponse({ status: 204, description: 'No Content — deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Not Found — clientId does not exist' })
   async removeApplication(@Param('clientId') clientId: string): Promise<void> {
     const deleted = await this.commandBus.execute(
       new RemoveMockApplicationCommand(clientId),
@@ -112,6 +124,8 @@ export class DeveloperPortalCommandHttpController {
    * Resets portal-managed mutable state back to startup defaults.
    */
   @Post('reset-defaults')
+  @ApiOperation({ summary: 'Reset portal state to startup defaults', description: 'Resets simulation config, clears portal-registered apps, and reinitializes mock state.' })
+  @ApiResponse({ status: 201, description: 'Reset summary — config, requestCount, applications' })
   async resetDefaults() {
     const result = await this.commandBus.execute(new ResetPortalStateCommand());
 

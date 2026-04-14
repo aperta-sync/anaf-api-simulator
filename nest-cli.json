@@ -9,6 +9,14 @@
         "include": "simulation/presentation/http/assets/**/*",
         "watchAssets": true
       }
+    ],
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "introspectComments": true
+        }
+      }
     ]
   }
 }
