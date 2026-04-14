@@ -3,7 +3,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 
 /**
  * ANAF Documentation Scraper - High Integrity Version
@@ -11,7 +11,8 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
  */
 
 const BASE_DIR = 'docs/anaf/scraped';
-const STATE_FILE = path.join(BASE_DIR, '.scraper-state.json');
+// STATE_FILE is no longer a local file path, it's a B2 Key
+const STATE_B2_KEY = 'anaf-docs/.scraper-state.json';
 const INDEX_URL = 'https://mfinante.gov.ro/ro/web/efactura/informatii-tehnice';
 const DISCORD_WEBHOOK = process.env.ANAF_NOTIFIER_WEBHOOK;
 
@@ -97,14 +98,48 @@ function getFolderForUrl(url) {
   return 'resources';
 }
 
+async function fetchStateFromB2() {
+  if (!s3Client) {
+    console.warn('⚠️ No B2 credentials found. Scraper state will NOT be saved between runs!');
+    return {};
+  }
+  try {
+    const data = await s3Client.send(new GetObjectCommand({
+      Bucket: process.env.B2_BUCKET_NAME,
+      Key: STATE_B2_KEY
+    }));
+    const stateStr = await data.Body.transformToString();
+    return JSON.parse(stateStr);
+  } catch (err) {
+    if (err.name === 'NoSuchKey') {
+      console.log('ℹ️ No existing state found in B2. Starting fresh.');
+      return {};
+    }
+    console.error(`  [WARN] Failed to fetch state from B2: ${err.message}`);
+    return {};
+  }
+}
+
+async function saveStateToB2(state) {
+  if (!s3Client) return;
+  try {
+    await s3Client.send(new PutObjectCommand({
+      Bucket: process.env.B2_BUCKET_NAME,
+      Key: STATE_B2_KEY,
+      Body: JSON.stringify(state, null, 2),
+      ContentType: 'application/json'
+    }));
+    console.log('💾 Successfully saved scraper state back to B2.');
+  } catch (err) {
+    console.error(`  [WARN] Failed to save state to B2: ${err.message}`);
+  }
+}
+
 async function runScraper() {
   console.log('\n🚀 ANAF High-Integrity Scraper Started');
   console.log(`📡 Fetching index: ${INDEX_URL}`);
 
-  let state = {};
-  if (fs.existsSync(STATE_FILE)) {
-    state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
-  }
+  let state = await fetchStateFromB2();
 
   const updates = [];
 
@@ -160,31 +195,38 @@ async function runScraper() {
         const etag = headResponse?.headers['etag'];
         const lastModified = headResponse?.headers['last-modified'];
 
-        if (
-          headResponse && fs.existsSync(targetPath) &&
-          etag && etag === entryState.etag &&
-          lastModified && lastModified === entryState.lastModified
-        ) {
-          process.stdout.write(' [SKIP: Header Match]\n');
-          
-          // Retroactive B2 Upload for already downloaded files
-          if (s3Client && !entryState.b2Uploaded) {
-            try {
-              process.stdout.write(`    └─ ☁️ Uploading existing file to B2...`);
-              const fileStream = fs.createReadStream(targetPath);
-              await s3Client.send(new PutObjectCommand({
-                Bucket: process.env.B2_BUCKET_NAME,
-                Key: `anaf-docs/${folder}/${filename}`,
-                Body: fileStream
-              }));
-              console.log(' [DONE]');
-              state[url] = { ...entryState, b2Uploaded: true };
-            } catch (b2Error) {
-              console.log(` [FAILED: ${b2Error.message}]`);
-            }
+        const stateMatches = etag && etag === entryState.etag && lastModified && lastModified === entryState.lastModified;
+
+        if (headResponse && stateMatches) {
+          // If the file hasn't changed on the server and is already in B2, we can skip it entirely,
+          // even if it doesn't exist locally (e.g. ignored large files in CI).
+          if (entryState.b2Uploaded) {
+            process.stdout.write(' [SKIP: State Match]\n');
+            continue;
           }
-          
-          continue;
+
+          // If it hasn't changed but needs a retroactive B2 upload, we need it locally
+          if (fs.existsSync(targetPath)) {
+            process.stdout.write(' [SKIP: Header Match]\n');
+            
+            if (s3Client && !entryState.b2Uploaded) {
+              try {
+                process.stdout.write(`    └─ Uploading existing file to B2...`);
+                const fileStream = fs.createReadStream(targetPath);
+                await s3Client.send(new PutObjectCommand({
+                  Bucket: process.env.B2_BUCKET_NAME,
+                  Key: `anaf-docs/${folder}/${filename}`,
+                  Body: fileStream
+                }));
+                console.log(' [DONE]');
+                state[url] = { ...entryState, b2Uploaded: true };
+              } catch (b2Error) {
+                console.log(` [FAILED: ${b2Error.message}]`);
+              }
+            }
+            continue;
+          }
+          // If it needs a B2 upload but isn't local, it will fall through and download it
         }
 
         process.stdout.write(' [DOWNLOAD]\n');
@@ -213,7 +255,7 @@ async function runScraper() {
         let b2Success = false;
         if (s3Client) {
           try {
-            process.stdout.write(`    └─ ☁️ Uploading to B2...`);
+            process.stdout.write(`    └─ Uploading to B2...`);
             const fileStream = fs.createReadStream(targetPath);
             await s3Client.send(new PutObjectCommand({
               Bucket: process.env.B2_BUCKET_NAME,
@@ -238,14 +280,14 @@ async function runScraper() {
             if (!fs.existsSync(swaggerDir)) fs.mkdirSync(swaggerDir, { recursive: true });
             const jsonFilename = filename.replace('.html', '.json');
             fs.writeFileSync(path.join(swaggerDir, jsonFilename), JSON.stringify(spec, null, 2));
-            console.log(`    └─ 🧩 Extracted OpenAPI spec to ${jsonFilename}`);
+            console.log(`    └─ Extracted OpenAPI spec to ${jsonFilename}`);
           }
         }
         // --------------------------------------
 
         const changeType = fs.existsSync(targetPath) ? 'UPDATED' : 'NEW';
         updates.push(`[${changeType}] ${filename} (${(receivedBytes / 1024 / 1024).toFixed(2)} MB)`);
-        console.log(`    └─ 🎉 ${changeType}! New checksum: ${newHash.slice(0, 8)}...`);
+        console.log(`    └─ ${changeType}! New checksum: ${newHash.slice(0, 8)}...`);
 
       } catch (error) {
         if (error.response?.status === 401) {
@@ -271,7 +313,7 @@ async function runScraper() {
     console.error(`\n🚨 Critical error: ${error.message}`);
   }
 
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  await saveStateToB2(state);
   console.log('🏁 Scraper Finished\n');
   process.exit(0);
 }

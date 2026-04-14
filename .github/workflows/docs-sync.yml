@@ -11,7 +11,8 @@ jobs:
   sync-docs:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed to push changes back to the repo
+      contents: read
+      issues: write # Needed to create an issue
 
     steps:
       - name: Checkout Repository
@@ -24,28 +25,47 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install axios
+        run: npm ci
 
       - name: Run Scraper
         env:
           ANAF_NOTIFIER_WEBHOOK: ${{ secrets.ANAF_NOTIFIER_WEBHOOK }}
+          B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}
+          B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_REGION: ${{ secrets.B2_REGION }}
         run: node scripts/anaf-scraper.mjs
 
-      - name: Check for changes
+      - name: Check for Swagger Changes
         id: git-check
         run: |
-          git add docs/anaf/scraped/
-          git status --porcelain
-          if [ -n "$(git status --porcelain)" ]; then
+          git status --porcelain docs/anaf/scraped/technical/swagger/
+          if [ -n "$(git status --porcelain docs/anaf/scraped/technical/swagger/)" ]; then
             echo "changes=true" >> $GITHUB_OUTPUT
+            
+            # Create a summary of changed files for the issue body
+            git status --porcelain docs/anaf/scraped/technical/swagger/ > changes.txt
+            echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
+            cat changes.txt >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           else
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit and Push changes
+      - name: Create Issue on Change
         if: steps.git-check.outputs.changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "ANAF Documentation Bot"
-          git config --global user.email "bot@aperta-sync.ro"
-          git commit -m "chore(docs): auto-update ANAF documentation [skip ci]"
-          git push
+          gh issue create \
+            --title "🚨 ANAF API Update Detected" \
+            --body "The automated scraper detected changes to the official ANAF OpenAPI specifications. 
+            
+            **Changed Files:**
+            \`\`\`
+            ${{ env.CHANGED_FILES }}
+            \`\`\`
+            
+            Please run \`node scripts/anaf-scraper.mjs\` locally with your B2 credentials to fetch the latest specs and update the mock server implementation accordingly." \
+            --assignee "${{ github.actor }}"
