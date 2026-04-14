@@ -39,3 +39,6 @@ tsconfig.build.tsbuildinfo
 # Local skill for version-update checker
 anaf-sync-validator
 anaf-sync-validator.skill
+
+# Ignore GitHub actions cron job files
+.github/workflows/docs-sync.yml
