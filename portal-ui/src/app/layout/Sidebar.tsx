@@ -80,6 +80,13 @@ export function Sidebar({ view }: SidebarProps) {
           </span>
           Simulation Config
         </button>
+        <button
+          className="nav-link"
+          onClick={() => window.open('/swagger', '_blank')}
+        >
+          <span className="material-symbols-outlined">api</span>
+          API Reference
+        </button>
       </nav>
     </aside>
   );

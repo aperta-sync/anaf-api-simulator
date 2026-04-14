@@ -7,6 +7,14 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { QueryBus } from '@nestjs/cqrs';
 import { Response } from 'express';
 import {
@@ -37,6 +45,8 @@ const VALID_FILTERS = ['P', 'T', 'E', 'R'];
 /**
  * Handles read-only e-Factura message query endpoints.
  */
+@ApiTags('e-Factura / Messages')
+@ApiBearerAuth('bearer')
 @Controller('prod/FCTEL/rest')
 export class MessagesQueryHttpController {
   constructor(
@@ -51,6 +61,22 @@ export class MessagesQueryHttpController {
   // ====================================================================
 
   @Get('listaMesajeFactura')
+  @ApiOperation({
+    summary: 'List e-Factura messages (simple)',
+    description:
+      'Returns up to 500 messages for the given CIF within a rolling window of 1–60 days. ' +
+      'When more than 500 messages exist, ANAF instructs the caller to use the paginated endpoint.\n\n' +
+      '**Rate limit:** 1 500 requests / day / CUI\n\n' +
+      '**Production URL:** `GET https://api.anaf.ro/prod/FCTEL/rest/listaMesajeFactura`',
+  })
+  @ApiQuery({ name: 'cif', description: 'Company fiscal identification code (numeric or RO-prefixed)', example: '1234567' })
+  @ApiQuery({ name: 'zile', description: 'Number of days to look back (1–60)', example: '30' })
+  @ApiQuery({ name: 'filtru', required: false, description: 'Message type filter. Accepted values: P (received), T (transmitted), E (errors), R (corrections)' })
+  @ApiHeader({ name: 'x-simulate-no-spv', required: false, description: 'Set to "true" to simulate the identity having no SPV rights' })
+  @ApiHeader({ name: 'x-simulate-wrong-certificate', required: false, description: 'Set to "true" to simulate a certificate/CIF mismatch (403 ANAF_CUI_MISMATCH)' })
+  @ApiResponse({ status: 200, description: 'JSON — message array or {eroare, titlu} error object' })
+  @ApiResponse({ status: 400, description: 'Bad Request — missing required parameters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid bearer token' })
   async listMessages(
     @Query() query: ListaMesajeFacturaQueryDto,
     @Headers('authorization') authorizationHeader: string | undefined,
@@ -174,6 +200,19 @@ export class MessagesQueryHttpController {
   // ====================================================================
 
   @Get('descarcare')
+  @ApiOperation({
+    summary: 'Download invoice ZIP archive',
+    description:
+      'Downloads the ZIP archive for a previously uploaded invoice identified by its `id` (the `index_incarcare` value). ' +
+      'Returns the binary ZIP file on success.\n\n' +
+      '**Rate limit:** 10 downloads / day / message ID\n\n' +
+      '**Production URL:** `GET https://api.anaf.ro/prod/FCTEL/rest/descarcare`',
+  })
+  @ApiQuery({ name: 'id', description: 'The upload index (index_incarcare) returned by the /upload endpoint', example: '5000000001' })
+  @ApiHeader({ name: 'x-simulate-no-download-rights', required: false, description: 'Set to "true" to simulate the identity lacking download rights for this invoice' })
+  @ApiResponse({ status: 200, description: 'Success — application/zip binary archive, or JSON {eroare, titlu} on error' })
+  @ApiResponse({ status: 400, description: 'Bad Request — missing id parameter' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid bearer token' })
   async download(
     @Query() query: DescarcareQueryDto,
     @Headers('authorization') authorizationHeader: string | undefined,
@@ -248,6 +287,24 @@ export class MessagesQueryHttpController {
   // ====================================================================
 
   @Get('listaMesajePaginatieFactura')
+  @ApiOperation({
+    summary: 'List e-Factura messages (paginated)',
+    description:
+      'Returns messages for the given CIF within a Unix-millisecond timestamp range, with page-based pagination. ' +
+      'The `startTime` must not be older than 60 days from the current moment.\n\n' +
+      '**Rate limit:** 100 000 requests / day / CUI\n\n' +
+      '**Production URL:** `GET https://api.anaf.ro/prod/FCTEL/rest/listaMesajePaginatieFactura`',
+  })
+  @ApiQuery({ name: 'cif', description: 'Company fiscal identification code (numeric or RO-prefixed)', example: '1234567' })
+  @ApiQuery({ name: 'startTime', description: 'Start of the time range as a Unix timestamp in milliseconds. Must not be older than 60 days.', example: '1700000000000' })
+  @ApiQuery({ name: 'endTime', description: 'End of the time range as a Unix timestamp in milliseconds. Must be after startTime and not in the future.', example: '1700086400000' })
+  @ApiQuery({ name: 'pagina', description: 'Page number (1-based)', example: '1' })
+  @ApiQuery({ name: 'filtru', required: false, description: 'Message type filter. Accepted values: P, T, E, R' })
+  @ApiHeader({ name: 'x-simulate-no-spv', required: false, description: 'Set to "true" to simulate no SPV rights' })
+  @ApiHeader({ name: 'x-simulate-wrong-certificate', required: false, description: 'Set to "true" to simulate certificate/CIF mismatch (403)' })
+  @ApiResponse({ status: 200, description: 'JSON — paginated message list or {eroare, titlu} error object' })
+  @ApiResponse({ status: 400, description: 'Bad Request — missing required parameters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid bearer token' })
   async listMessagesPaginated(
     @Query() query: ListaMesajePaginatieFacturaQueryDto,
     @Headers('authorization') authorizationHeader: string | undefined,
@@ -416,6 +473,22 @@ export class MessagesQueryHttpController {
   // ====================================================================
 
   @Get('stareMesaj')
+  @ApiOperation({
+    summary: 'Get upload status (stare mesaj)',
+    description:
+      'Returns an XML response with the current processing state (`stare`) of a previously uploaded invoice. ' +
+      'Possible `stare` values: `ok`, `nok`, `in prelucrare`, `XML cu erori nepreluat de sistem`.\n\n' +
+      '**Rate limit:** 100 requests / day / id_incarcare\n\n' +
+      '**Production URL:** `GET https://api.anaf.ro/prod/FCTEL/rest/stareMesaj`',
+  })
+  @ApiQuery({ name: 'id_incarcare', description: 'The upload index returned by the /upload endpoint', example: '5000000001' })
+  @ApiHeader({ name: 'x-simulate-invalid-xml', required: false, description: 'Set to "true" to simulate the invoice being in "XML cu erori nepreluat de sistem" state' })
+  @ApiHeader({ name: 'x-simulate-nok', required: false, description: 'Set to "true" to simulate a "nok" (processing failure) state' })
+  @ApiHeader({ name: 'x-simulate-no-spv', required: false, description: 'Set to "true" to simulate the identity having no SPV rights' })
+  @ApiHeader({ name: 'x-simulate-no-query-rights', required: false, description: 'Set to "true" to simulate the identity lacking query rights for this id_incarcare' })
+  @ApiResponse({ status: 200, description: 'XML — <header> with stare attribute and optional id_descarcare or <Errors> element' })
+  @ApiResponse({ status: 400, description: 'Bad Request — missing id_incarcare parameter' })
+  @ApiResponse({ status: 401, description: 'Unauthorized — missing or invalid bearer token' })
   async getMessageState(
     @Query() query: StareMesajQueryDto,
     @Headers('authorization') authorizationHeader: string | undefined,

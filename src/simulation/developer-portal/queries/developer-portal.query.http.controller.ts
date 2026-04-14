@@ -8,6 +8,14 @@ import {
   Res,
 } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
+import {
+  ApiExcludeEndpoint,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
@@ -21,6 +29,7 @@ import {
 } from '../../application/developer-portal/developer-portal.queries';
 import { SimulationTypes } from '../../domain/simulation.types';
 
+@ApiTags('Developer Portal')
 @Controller()
 export class DeveloperPortalQueryHttpController {
   private static readonly ASSET_CONTENT_TYPES: Record<string, string> = {
@@ -112,11 +121,13 @@ export class DeveloperPortalQueryHttpController {
 
   @Get(['/', '/apps', '/oauth', '/data', '/inspector', '/settings'])
   @Header('Content-Type', 'text/html; charset=utf-8')
+  @ApiExcludeEndpoint()
   renderConsole(): string {
     return DeveloperPortalQueryHttpController.CONSOLE_HTML;
   }
 
   @Get('developer-portal/assets/:assetName')
+  @ApiExcludeEndpoint()
   serveAsset(
     @Param('assetName') assetName: string,
     @Res() response: Response,
@@ -131,16 +142,20 @@ export class DeveloperPortalQueryHttpController {
 
   @Get('developer-portal/oauth/callback')
   @Header('Content-Type', 'text/html; charset=utf-8')
+  @ApiExcludeEndpoint()
   renderOAuthCallbackCapture(): string {
     return DeveloperPortalQueryHttpController.CALLBACK_HTML;
   }
 
   @Get('favicon.ico')
+  @ApiExcludeEndpoint()
   serveFavicon(@Res() response: Response): void {
     response.status(204).send();
   }
 
   @Get('developer-portal/api/internal/companies')
+  @ApiOperation({ summary: 'List all seeded companies', description: 'Returns all company profiles currently in the mock registry.' })
+  @ApiResponse({ status: 200, description: 'Array of CompanyProfile objects wrapped in {companies}' })
   async listAllCompanies() {
     return {
       companies: await this.queryBus.execute(new ListInternalCompaniesQuery()),
@@ -148,6 +163,8 @@ export class DeveloperPortalQueryHttpController {
   }
 
   @Get('developer-portal/api/internal/messages')
+  @ApiOperation({ summary: 'List all stored invoice messages', description: 'Returns all invoice messages currently stored in the mock registry.' })
+  @ApiResponse({ status: 200, description: 'Array of StoredInvoiceMessage objects wrapped in {messages}' })
   async listAllMessages() {
     return {
       messages: await this.queryBus.execute(new ListInternalMessagesQuery()),
@@ -155,6 +172,8 @@ export class DeveloperPortalQueryHttpController {
   }
 
   @Get('developer-portal/api/internal/identities')
+  @ApiOperation({ summary: 'List all mock signer identities', description: 'Returns the signer identities available in the mock, including their authorized CUI list.' })
+  @ApiResponse({ status: 200, description: 'Array of IdentityProfile objects wrapped in {identities}' })
   async listMockIdentities() {
     return {
       identities: await this.queryBus.execute(new ListMockIdentitiesQuery()),
@@ -162,6 +181,9 @@ export class DeveloperPortalQueryHttpController {
   }
 
   @Get('developer-portal/api/internal/graph')
+  @ApiOperation({ summary: 'Get invoice network graph', description: 'Returns a force-directed graph of invoice relationships between companies for the given time window.' })
+  @ApiQuery({ name: 'days', required: false, description: 'Time window in days (1–90, default 30)', example: '30' })
+  @ApiResponse({ status: 200, description: 'InvoiceNetworkGraph object with nodes and edges' })
   async getInvoiceNetworkGraph(@Query('days') days?: string) {
     const windowDays = Math.min(
       90,
@@ -175,12 +197,18 @@ export class DeveloperPortalQueryHttpController {
   }
 
   @Get('developer-portal/api/apps')
+  @ApiOperation({ summary: 'List all registered mock applications' })
+  @ApiResponse({ status: 200, description: 'Array of RegisteredMockApplication objects wrapped in {applications}' })
   async listApplications() {
     const apps = await this.queryBus.execute(new ListMockApplicationsQuery());
     return { applications: apps.map((app) => this.toApiModel(app)) };
   }
 
   @Get('developer-portal/api/apps/:clientId')
+  @ApiOperation({ summary: 'Get a mock application by client ID' })
+  @ApiParam({ name: 'clientId', description: 'OAuth client identifier' })
+  @ApiResponse({ status: 200, description: 'RegisteredMockApplication wrapped in {application}' })
+  @ApiResponse({ status: 404, description: 'Not Found' })
   async getApplication(@Param('clientId') clientId: string) {
     const existing = await this.queryBus.execute(
       new GetMockApplicationQuery(clientId),

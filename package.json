@@ -26,6 +26,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/schedule": "^6.0.0",
     "@nestjs/serve-static": "^5.0.0",
+    "@nestjs/swagger": "^11.2.7",
     "adm-zip": "^0.5.17",
     "axios": "^1.15.0",
     "class-transformer": "^0.5.1",
@@ -37,6 +38,7 @@
     "oxide.ts": "^1.1.0",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.2.0",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

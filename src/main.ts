@@ -1,5 +1,6 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AnafMockServerModule } from './anaf-mock-server.module';
 
 /**
@@ -34,10 +35,41 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });
 
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('ANAF e-Factura Mock API')
+    .setDescription(
+      'High-fidelity mock of the Romanian ANAF e-Factura REST API.\n\n' +
+      '**Production base URL:** `https://api.anaf.ro`\n\n' +
+      'Use the `X-Simulate-*` headers listed on each endpoint to force specific ANAF error scenarios ' +
+      'without needing real certificates or uploaded invoices.',
+    )
+    .setVersion('0.5.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'ANAF OAuth2 access token' },
+      'bearer',
+    )
+    .addTag('e-Factura / Upload', 'Invoice upload endpoints — mirrors https://api.anaf.ro/prod/FCTEL/rest')
+    .addTag('e-Factura / Messages', 'Message listing, download and status — mirrors https://api.anaf.ro/prod/FCTEL/rest')
+    .addTag('OAuth 2.0', 'ANAF OAuth2 authorization and token endpoints — mirrors https://api.anaf.ro/anaf-oauth2/v1')
+    .addTag('VAT Registry', 'VAT payer lookup — mirrors https://api.anaf.ro/api/PlatitorTvaRest/v9')
+    .addTag('Simulation Control', 'Mock-only endpoints: adjust latency, error-rate, rate-limits and seed data')
+    .addTag('Developer Portal', 'Mock-only internal API for the developer portal console')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('swagger', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+  });
+
   const port = Number(process.env.ANAF_MOCK_PORT ?? 3003);
   await app.listen(port);
 
   logger.log(`ANAF mock server running on port ${port}`);
+  logger.log(`Swagger UI available at http://localhost:${port}/swagger`);
 }
 
 bootstrap();
