@@ -12,7 +12,7 @@ export const CHEAT_HEADERS: CheatHeader[] = [
   },
   {
     name: 'x-simulate-technical-error',
-    description: 'Set to "true" to force a technical server error response',
+    description: 'Set to "true" to force a technical server error response (Returns HTTP 200 with XML ExecutionStatus=1, not a 500)',
     endpoints: ['POST /prod/FCTEL/rest/upload', 'POST /prod/FCTEL/rest/uploadb2c'],
   },
   {
