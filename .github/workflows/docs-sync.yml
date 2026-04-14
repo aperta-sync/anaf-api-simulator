@@ -49,6 +49,12 @@ jobs:
             echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
             cat changes.txt >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
+            
+            # Capture the actual diff to show what exactly changed
+            git diff docs/anaf/scraped/technical/swagger/ > diff.txt
+            echo "SPEC_DIFF<<EOF" >> $GITHUB_ENV
+            cat diff.txt >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           else
             echo "changes=false" >> $GITHUB_OUTPUT
           fi
@@ -66,6 +72,14 @@ jobs:
             \`\`\`
             ${{ env.CHANGED_FILES }}
             \`\`\`
+            
+            <details>
+            <summary><b>View Spec Differences</b> (Click to expand)</summary>
+
+            \`\`\`diff
+            ${{ env.SPEC_DIFF }}
+            \`\`\`
+            </details>
             
             Please run \`node scripts/anaf-scraper.mjs\` locally with your B2 credentials to fetch the latest specs and update the mock server implementation accordingly." \
             --assignee "${{ github.actor }}"
