@@ -1,5 +1,10 @@
 # ANAF API Simulation Engine (Digital Twin)
 
+[![CI](https://github.com/aperta-sync/anaf-api-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/aperta-sync/anaf-api-simulator/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/aperta-sync/anaf-api-simulator?style=social)](https://github.com/aperta-sync/anaf-api-simulator/stargazers)
+![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Faperta-sync%2Fanaf-api-simulator&label=Views&icon=github&color=%230d6efd&message=&style=flat&tz=UTC)
+
 A NestJS-based high-fidelity simulator for building and testing integrations with Romanian ANAF APIs, including OAuth2, e-Factura, and VAT lookup workflows.
 
 This service is designed for local development and CI environments where you want realistic API behavior without requiring a physical digital certificate, live ANAF credentials, or an actual ANAF developer account.
@@ -64,25 +69,26 @@ The project maintains a high-fidelity sync with official ANAF documentation.
   - **Technical Specs**: `docs/anaf/scraped/technical/` contains raw HTML and text limit files.
 
 ### CI/CD Documentation Parity
+
 Our GitHub Action `Check ANAF Documentation Parity` ensures the codebase stays in sync. If ANAF updates their documentation, the pipeline will fail, alerting us to update the mock server.
 
 To update the scraped documentation locally, run:
+
 ```bash
 node scripts/anaf-scraper.mjs
 ```
-
 
 ### Simulating Edge Cases (Cheat Headers)
 
 You can trigger specific ANAF error responses by sending custom HTTP headers with your requests. This is useful for testing your application's error-handling logic.
 
-| Header | Value | Description |
-| :--- | :--- | :--- |
-| `X-Simulate-Upload-Error` | `true` | Returns a generic upload validation error XML. |
-| `X-Simulate-Xml-Validation` | `true` | Returns a SAXParseException (invalid XML) error XML. |
-| `X-Simulate-No-Spv` | `true` | Returns "Nu exista niciun CIF pentru care sa aveti drept in SPV". |
-| `X-Simulate-Wrong-Certificate` | `true` | Returns an `ANAF_CUI_MISMATCH` 403 error. |
-| `X-Simulate-Technical-Error` | `true` | Returns a "Cod: SIM-001" technical error XML. |
+| Header                         | Value  | Description                                                       |
+| :----------------------------- | :----- | :---------------------------------------------------------------- |
+| `X-Simulate-Upload-Error`      | `true` | Returns a generic upload validation error XML.                    |
+| `X-Simulate-Xml-Validation`    | `true` | Returns a SAXParseException (invalid XML) error XML.              |
+| `X-Simulate-No-Spv`            | `true` | Returns "Nu exista niciun CIF pentru care sa aveti drept in SPV". |
+| `X-Simulate-Wrong-Certificate` | `true` | Returns an `ANAF_CUI_MISMATCH` 403 error.                         |
+| `X-Simulate-Technical-Error`   | `true` | Returns a "Cod: SIM-001" technical error XML.                     |
 
 ---
 
