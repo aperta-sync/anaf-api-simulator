@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 /**
  * ANAF Documentation Scraper - High Integrity Version
@@ -12,6 +13,18 @@ const BASE_DIR = 'docs/anaf/scraped';
 const STATE_FILE = path.join(BASE_DIR, '.scraper-state.json');
 const INDEX_URL = 'https://mfinante.gov.ro/ro/web/efactura/informatii-tehnice';
 const DISCORD_WEBHOOK = process.env.ANAF_NOTIFIER_WEBHOOK;
+
+let s3Client = null;
+if (process.env.B2_ACCESS_KEY_ID && process.env.B2_SECRET_ACCESS_KEY && process.env.B2_BUCKET_NAME) {
+  s3Client = new S3Client({
+    endpoint: process.env.B2_ENDPOINT || 'https://s3.us-east-005.backblazeb2.com',
+    region: process.env.B2_REGION || 'us-east-005',
+    credentials: {
+      accessKeyId: process.env.B2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.B2_SECRET_ACCESS_KEY,
+    }
+  });
+}
 
 const SWAGGER_SOURCES = [];
 
@@ -179,6 +192,23 @@ async function runScraper() {
         if (fs.existsSync(tempPath)) fs.renameSync(tempPath, targetPath);
         state[url] = { etag, lastModified, hash: newHash, downloadedAt: new Date().toISOString() };
         
+        // --- B2 Upload ---
+        if (s3Client) {
+          try {
+            process.stdout.write(`    └─ ☁️ Uploading to B2...`);
+            const fileStream = fs.createReadStream(targetPath);
+            await s3Client.send(new PutObjectCommand({
+              Bucket: process.env.B2_BUCKET_NAME,
+              Key: `anaf-docs/${folder}/${filename}`,
+              Body: fileStream
+            }));
+            console.log(' [DONE]');
+          } catch (b2Error) {
+            console.log(` [FAILED: ${b2Error.message}]`);
+          }
+        }
+        // -----------------
+
         // --- Extract OpenAPI Spec from HTML ---
         if (url.toLowerCase().endsWith('.html')) {
           const content = fs.readFileSync(targetPath, 'utf-8');
