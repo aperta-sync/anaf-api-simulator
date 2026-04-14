@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "anaf-mock-server": {
-      "url": "http://localhost:3003/mcp/sse",
-      "timeout": 30000
-    }
-  }
-}
