@@ -244,10 +244,12 @@ async function runScraper() {
 
         const newHash = await getFileHash(tempPath);
 
-        if (fs.existsSync(targetPath) && newHash === entryState.hash) {
-          process.stdout.write(`    └─ No change (Checksum verified: ${newHash.slice(0, 8)}...)\n`);
-          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-          continue;
+        if (newHash === entryState.hash) {
+          if (entryState.b2Uploaded) {
+            process.stdout.write(`    └─ No change (Checksum verified: ${newHash.slice(0, 8)}...)\n`);
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+            continue;
+          }
         }
 
         if (fs.existsSync(tempPath)) fs.renameSync(tempPath, targetPath);
