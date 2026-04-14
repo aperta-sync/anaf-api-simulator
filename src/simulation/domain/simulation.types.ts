@@ -33,6 +33,12 @@ export namespace SimulationTypes {
     address: string;
     countryCode?: string;
     vatPayer: boolean;
+    // Seedable fields for realistic VAT lookup responses
+    nrRegCom?: string;
+    streetName?: string;
+    streetNumber?: string;
+    locality?: string;
+    countyCode?: string;
   }
 
   export interface IdentityProfile {
@@ -53,6 +59,8 @@ export namespace SimulationTypes {
     autoGenerateTraffic: boolean;
     strictVatLookup: boolean;
     strictOwnershipValidation: boolean;
+    // ANAF mock processing delay (env: ANAF_MOCK_PROCESSING_DELAY_MS)
+    processingDelayMs?: number;
   }
 
   export interface SeedCompanyRequest {
@@ -63,6 +71,11 @@ export namespace SimulationTypes {
     address: string;
     countryCode?: string;
     vatPayer?: boolean;
+    nrRegCom?: string;
+    streetName?: string;
+    streetNumber?: string;
+    locality?: string;
+    countyCode?: string;
   }
 
   export interface SeedPresetSummary {
@@ -116,7 +129,18 @@ export namespace SimulationTypes {
     notFound: string[];
   }
 
+  // ANAF-standard 6-field message entry (used by listaMesajePaginatieFactura)
   export interface MessageListEntry {
+    id: string;
+    data_creare: string; // YYYYMMDDHHmm format
+    cif: string;
+    tip: string;
+    id_solicitare: string; // upload index from supplier
+    detalii: string;
+  }
+
+  // Legacy 11-field message entry (used by listaMesajeFactura for backwards compat)
+  export interface MessageListEntryLegacy {
     id: string;
     data_creare: string;
     creation_date: string;
@@ -142,6 +166,48 @@ export namespace SimulationTypes {
     customer: CompanyProfile;
     lineDescription: string;
     createdAt: Date;
+    // Legacy fields kept internally
+    cif_emitent?: string;
+    cif_beneficiar?: string;
+    suma?: number;
+    currency?: string;
+    // Upload metadata
+    id_solicitare: string;
+    stare?: StareMesajValue;
+    processingDelayMs?: number;
+  }
+
+  export type StareMesajValue = 'ok' | 'nok' | 'in prelucrare' | 'XML cu erori nepreluat de sistem';
+
+  export interface UploadTrackingRecord {
+    index_incarcare: string;
+    createdAt: Date;
+    cif: string;
+    status: StareMesajValue;
+    id_descarcare?: string;
+    xml_content?: string;
+    extern?: boolean;
+    autofactura?: boolean;
+    executare?: boolean;
+  }
+
+  export interface StareMesajResponse {
+    index_incarcare: string;
+    stare: StareMesajValue;
+    id_descarcare?: string;
+    mesaj?: string;
+  }
+
+  export interface PaginatieMesajeResponse {
+    titlu?: string;
+    serial?: string;
+    cui?: string;
+    mesaje: MessageListEntry[];
+    count: number;
+    page: number;
+    per_page: number;
+    filtru?: string;
+    eroare?: string;
   }
 
   export interface InvoiceNetworkNode {
