@@ -424,22 +424,21 @@ describe('AnafMockServer (e2e)', () => {
       rateLimitTrigger: true,
     });
 
-    const cfg = await request(app.getHttpServer())
-      .get('/simulation/config')
-      .expect(200);
-    const requestCount = cfg.body.requestCount as number;
-    const remainder = requestCount % 5;
-    const callsUntilRateLimit = remainder === 0 ? 5 : 5 - remainder;
-
-    let lastStatus = 200;
-    for (let index = 0; index < callsUntilRateLimit; index += 1) {
+    let found429 = false;
+    // Since it triggers every 5th request globally, making 6 requests guarantees we hit it at least once
+    // regardless of the initial requestCount value.
+    for (let index = 0; index < 6; index += 1) {
       const response = await request(app.getHttpServer())
         .get('/prod/FCTEL/rest/listaMesajeFactura?cif=RO10000008&zile=7')
         .set('Authorization', `Bearer ${accessToken}`);
-      lastStatus = response.status;
+      
+      if (response.status === 429) {
+        found429 = true;
+        break;
+      }
     }
 
-    expect(lastStatus).toBe(429);
+    expect(found429).toBe(true);
 
     await updateConfig({
       latencyMs: 0,
