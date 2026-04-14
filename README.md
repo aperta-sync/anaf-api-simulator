@@ -15,6 +15,8 @@ This service is designed for local development and CI environments where you wan
 - **e-Factura Simulation:** 100% OpenAPI compliant implementations of `/upload`, `/uploadb2c`, `/stareMesaj`, `/listaMesajeFactura`, `/listaMesajePaginatieFactura`, and `/descarcare`.
 - **ANAF-Specific Rate Limiting:** Enforces official daily quotas (e.g., 1000 RASP/day, 100,000 paginated list queries/day) with exact ANAF error messages.
 - **Strict Validation:** Replicates ANAF's unique HTTP 200 XML/JSON error responses for file sizes (>10MB), invalid timestamps (60-day limits), and missing parameters.
+- **Swagger API Documentation:** Interactive Swagger UI at `/swagger` cross-referencing official ANAF URLs and fully documenting all simulation cheat headers.
+- **MCP (Model Context Protocol) Server:** Built-in MCP server at `/mcp/sse` turning the mock into an AI-native tool. AI agents (Claude, Cursor, Windsurf) can dynamically read ANAF schemas, understand cheat headers, and execute tools to generate valid integration code.
 - **Fault Injection:** Configurable latency, random 500/504 errors, and generic 429 rate-limiting modes for edge-case testing.
 - **Traffic Generation:** Background tasks to simulate active SPV inboxes with realistic inter-company invoice flow.
 - **VAT Registry Simulation:** Mock VAT lookup (v9 standard) with deterministic company data.
@@ -63,14 +65,16 @@ The project includes a multi-stage **lightweight Dockerfile** (Alpine-based) opt
 The project maintains a high-fidelity sync with official ANAF documentation.
 
 - **[Official Docs](docs/anaf/official/)**: Original PDFs and registration procedures.
-- **[Manual Guides](docs/anaf/manual/)**: Human-readable summaries of API endpoints and OAuth2 registration.
+- **[Manual Guides](docs/anaf/manual/)**: Human-readable summaries of API endpoints, OAuth2 registration, and the complete e-Factura integration workflow.
 - **[Scraped Assets](docs/anaf/scraped/)**:
   - **Swagger JSONs**: `docs/anaf/scraped/technical/swagger/` contains automated OpenAPI extractions.
-  - **Technical Specs**: `docs/anaf/scraped/technical/` contains raw HTML and text limit files.
+  - **Technical Specs**: `docs/anaf/scraped/technical/` contains text limit files.
 
-### CI/CD Documentation Parity
+### Automated ANAF Watchdog (Backblaze B2 & GitHub Actions)
 
-Our GitHub Action `Check ANAF Documentation Parity` ensures the codebase stays in sync. If ANAF updates their documentation, the pipeline will fail, alerting us to update the mock server.
+To keep the repository lean, our scraper automatically offloads heavy ANAF assets (>200MB of PDFs and ZIPs) and its execution state directly to a **Backblaze B2** bucket.
+
+Our daily GitHub Action `Check ANAF Documentation Parity` (`docs-sync.yml`) runs the scraper. If ANAF updates their API, the action uses `gh issue create` to automatically open a tracked Issue alerting maintainers to update the mock code. Furthermore, any Pull Request (`ci.yml`) will fail if code is pushed that is out-of-sync with ANAF's documentation.
 
 To update the scraped documentation locally, run:
 
