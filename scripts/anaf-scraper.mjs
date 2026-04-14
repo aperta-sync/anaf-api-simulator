@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -165,6 +166,24 @@ async function runScraper() {
           lastModified && lastModified === entryState.lastModified
         ) {
           process.stdout.write(' [SKIP: Header Match]\n');
+          
+          // Retroactive B2 Upload for already downloaded files
+          if (s3Client && !entryState.b2Uploaded) {
+            try {
+              process.stdout.write(`    └─ ☁️ Uploading existing file to B2...`);
+              const fileStream = fs.createReadStream(targetPath);
+              await s3Client.send(new PutObjectCommand({
+                Bucket: process.env.B2_BUCKET_NAME,
+                Key: `anaf-docs/${folder}/${filename}`,
+                Body: fileStream
+              }));
+              console.log(' [DONE]');
+              state[url] = { ...entryState, b2Uploaded: true };
+            } catch (b2Error) {
+              console.log(` [FAILED: ${b2Error.message}]`);
+            }
+          }
+          
           continue;
         }
 
@@ -190,9 +209,8 @@ async function runScraper() {
         }
 
         if (fs.existsSync(tempPath)) fs.renameSync(tempPath, targetPath);
-        state[url] = { etag, lastModified, hash: newHash, downloadedAt: new Date().toISOString() };
-        
         // --- B2 Upload ---
+        let b2Success = false;
         if (s3Client) {
           try {
             process.stdout.write(`    └─ ☁️ Uploading to B2...`);
@@ -203,10 +221,12 @@ async function runScraper() {
               Body: fileStream
             }));
             console.log(' [DONE]');
+            b2Success = true;
           } catch (b2Error) {
             console.log(` [FAILED: ${b2Error.message}]`);
           }
         }
+        state[url] = { etag, lastModified, hash: newHash, downloadedAt: new Date().toISOString(), b2Uploaded: b2Success };
         // -----------------
 
         // --- Extract OpenAPI Spec from HTML ---
