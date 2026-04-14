@@ -46,3 +46,6 @@ docs/anaf/scraped/**/*.zip
 docs/anaf/scraped/**/*.html
 docs/anaf/official/*.pdf
 docs/anaf/scraped/.scraper-state.json
+
+# Gemini CLI settings
+.gemini/
