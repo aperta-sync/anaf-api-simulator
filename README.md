@@ -60,11 +60,52 @@ The project includes a multi-stage **lightweight Dockerfile** (Alpine-based) opt
      anaf-mock-server:latest
    ```
 
+---
+
+## MCP Server Setup (AI Integration)
+
+This mock server includes a built-in **Model Context Protocol (MCP)** server that turns the entire ANAF API simulation into a set of tools for AI agents. This allows LLMs (like Claude or Gemini) to dynamically generate, test, and debug your ANAF integration.
+
+### 1. Claude Code
+
+To add the ANAF mock server as an MCP tool in Claude Code:
+
+```bash
+claude mcp add --transport sse anaf-mock-server http://localhost:3003/mcp/sse
+```
+
+### 2. Gemini / Cursor / Windsurf
+
+Add the following to your MCP configuration file (e.g., `.gemini/settings.json` or through the IDE settings):
+
+```json
+{
+  "mcpServers": {
+    "anaf-mock-server": {
+      "url": "http://localhost:3003/mcp/sse",
+      "timeout": 30000
+    }
+  }
+}
+```
+
+### How it Works (AI Workflow)
+
+Once connected, your AI agent can perform tasks like:
+
+1. **"Check if my upload request matches the official ANAF schema."** (Uses `get_swagger_spec`)
+2. **"Generate a valid UBL XML for testing."** (Uses `generate_ubl_xml`)
+3. **"List all available simulation headers."** (Uses `list_cheat_headers`)
+4. **"Verify my rate-limit consumption for today."** (Uses `check_quota_usage`)
+
+This drastically reduces the time needed to build robust e-Factura integrations by letting the AI "know" the API better than a human.
+
+---
+
 ## Documentation
 
 The project maintains a high-fidelity sync with official ANAF documentation.
 
-- **[Official Docs](docs/anaf/official/)**: Original PDFs and registration procedures.
 - **[Manual Guides](docs/anaf/manual/)**: Human-readable summaries of API endpoints, OAuth2 registration, and the complete e-Factura integration workflow.
 - **[Scraped Assets](docs/anaf/scraped/)**:
   - **Swagger JSONs**: `docs/anaf/scraped/technical/swagger/` contains automated OpenAPI extractions.
