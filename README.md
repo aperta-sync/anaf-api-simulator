@@ -9,6 +9,8 @@ A NestJS-based high-fidelity simulator for building and testing integrations wit
 
 This service is designed for local development and CI environments where you want realistic API behavior without requiring a physical digital certificate, live ANAF credentials, or an actual ANAF developer account.
 
+![ANAF Mock Server Demo](docs/assets/demo.gif)
+
 ## Features
 
 - **Full OAuth2 Flow:** Authorization Code grant flow, Token exchange, and Refresh support.
@@ -16,7 +18,7 @@ This service is designed for local development and CI environments where you wan
 - **ANAF-Specific Rate Limiting:** Enforces official daily quotas (e.g., 1000 RASP/day, 100,000 paginated list queries/day) with exact ANAF error messages.
 - **Strict Validation:** Replicates ANAF's unique HTTP 200 XML/JSON error responses for file sizes (>10MB), invalid timestamps (60-day limits), and missing parameters.
 - **Swagger API Documentation:** Interactive Swagger UI at `/swagger` cross-referencing official ANAF URLs and fully documenting all simulation cheat headers.
-- **MCP (Model Context Protocol) Server:** Built-in MCP server at `/mcp/sse` turning the mock into an AI-native tool. AI agents (Claude, Cursor, Windsurf) can dynamically read ANAF schemas, understand cheat headers, and execute tools to generate valid integration code.
+- **MCP (Model Context Protocol) Server:** Built-in MCP server at `/mcp` (Streamable HTTP transport) turning the mock into an AI-native tool. AI agents (Claude, Gemini, Cursor, Windsurf) can dynamically read ANAF schemas, understand cheat headers, and execute tools to generate valid integration code.
 - **Fault Injection:** Configurable latency, random 500/504 errors, and generic 429 rate-limiting modes for edge-case testing.
 - **Traffic Generation:** Background tasks to simulate active SPV inboxes with realistic inter-company invoice flow.
 - **VAT Registry Simulation:** Mock VAT lookup (v9 standard) with deterministic company data.
@@ -72,23 +74,50 @@ docker run -p 3003:3003 \
 
 This mock server includes a built-in **Model Context Protocol (MCP)** server that turns the entire ANAF API simulation into a set of tools for AI agents. This allows LLMs (like Claude or Gemini) to dynamically generate, test, and debug your ANAF integration.
 
+The server uses the **Streamable HTTP** transport (the current MCP standard) at a single endpoint: `http://localhost:3003/mcp`.
+
 ### 1. Claude Code
 
-To add the ANAF mock server as an MCP tool in Claude Code:
-
 ```bash
-claude mcp add --transport sse anaf-mock-server http://localhost:3003/mcp/sse
+claude mcp add --transport http anaf-mock-server http://localhost:3003/mcp
 ```
 
-### 2. Gemini / Cursor / Windsurf
+To verify the server was added:
+```bash
+claude mcp list
+```
 
-Add the following to your MCP configuration file (e.g., `.gemini/settings.json` or through the IDE settings):
+To remove it:
+```bash
+claude mcp remove anaf-mock-server
+```
+
+### 2. Gemini CLI
+
+Add the following to `~/.gemini/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "anaf-mock-server": {
-      "url": "http://localhost:3003/mcp/sse",
+      "httpUrl": "http://localhost:3003/mcp",
+      "timeout": 30000
+    }
+  }
+}
+```
+
+> **Note:** The `httpUrl` key targets the Streamable HTTP transport. If your Gemini CLI version does not yet support `httpUrl`, try `"url": "http://localhost:3003/mcp"` instead — some tools accept both keys for the same transport.
+
+### 3. Cursor / Windsurf / Other IDEs
+
+For any IDE or tool that reads a generic MCP JSON config:
+
+```json
+{
+  "mcpServers": {
+    "anaf-mock-server": {
+      "url": "http://localhost:3003/mcp",
       "timeout": 30000
     }
   }
