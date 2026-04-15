@@ -41,24 +41,30 @@ This service is designed for local development and CI environments where you wan
 
 ### Docker Usage
 
-The project includes a multi-stage **lightweight Dockerfile** (Alpine-based) optimized for production.
+The project is published as a multi-stage **lightweight Docker image** (Alpine-based) to GitHub Container Registry (GHCR).
 
-1. **Build the image locally:**
-   ```bash
-   docker build -t anaf-mock-server:latest .
-   ```
-2. **Run with default settings:**
-   ```bash
-   docker run -p 3003:3003 anaf-mock-server:latest
-   ```
-3. **Run with custom Simulation Settings:**
-   ```bash
-   docker run -p 3003:3003 \
-     -e ANAF_MOCK_LATENCY_MS=500 \
-     -e ANAF_MOCK_ERROR_RATE=5 \
-     -e ANAF_MOCK_STRICT_OWNERSHIP=true \
-     anaf-mock-server:latest
-   ```
+#### 1. Quick Start (Official Image)
+Run the latest stable release directly from GHCR:
+```bash
+docker run -p 3003:3003 ghcr.io/aperta-sync/anaf-api-simulator:latest
+```
+
+#### 2. Local Build
+If you want to build the image locally from source:
+```bash
+docker build -t anaf-mock-server:latest .
+docker run -p 3003:3003 anaf-mock-server:latest
+```
+
+#### 3. Custom Simulation Settings
+You can customize the simulation behavior via environment variables:
+```bash
+docker run -p 3003:3003 \
+  -e ANAF_MOCK_LATENCY_MS=500 \
+  -e ANAF_MOCK_ERROR_RATE=5 \
+  -e ANAF_MOCK_STRICT_OWNERSHIP=true \
+  ghcr.io/aperta-sync/anaf-api-simulator:latest
+```
 
 ---
 
