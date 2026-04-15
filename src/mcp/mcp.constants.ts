@@ -7,27 +7,27 @@ export interface CheatHeader {
 export const CHEAT_HEADERS: CheatHeader[] = [
   {
     name: 'x-simulate-upload-error',
-    description: 'Set to "true" to force a generic upload validation error (ExecutionStatus=1)',
+    description: 'MOCK ONLY: Force a generic upload validation error (ExecutionStatus=1). Do not use in production.',
     endpoints: ['POST /prod/FCTEL/rest/upload', 'POST /prod/FCTEL/rest/uploadb2c'],
   },
   {
     name: 'x-simulate-technical-error',
-    description: 'Set to "true" to force a technical server error response (Returns HTTP 200 with XML ExecutionStatus=1, not a 500)',
+    description: 'MOCK ONLY: Force a technical server error response (HTTP 200 with XML ExecutionStatus=1). Do not use in production.',
     endpoints: ['POST /prod/FCTEL/rest/upload', 'POST /prod/FCTEL/rest/uploadb2c'],
   },
   {
     name: 'x-simulate-xml-validation-error',
-    description: 'Set to "true" to simulate an XML schema validation failure (SAXParseException)',
+    description: 'MOCK ONLY: Simulate an XML schema validation failure (SAXParseException). Do not use in production.',
     endpoints: ['POST /prod/FCTEL/rest/upload', 'POST /prod/FCTEL/rest/uploadb2c'],
   },
   {
     name: 'x-simulate-executare-registry',
-    description: 'Set to "true" to simulate CIF not registered in the judicial enforcement registry',
+    description: 'MOCK ONLY: Simulate CIF not registered in the judicial enforcement registry. Do not use in production.',
     endpoints: ['POST /prod/FCTEL/rest/upload', 'POST /prod/FCTEL/rest/uploadb2c'],
   },
   {
     name: 'x-simulate-no-spv',
-    description: 'Set to "true" to simulate missing SPV authorization (no messages returned)',
+    description: 'MOCK ONLY: Simulate missing SPV authorization (no messages returned). Do not use in production.',
     endpoints: [
       'GET /prod/FCTEL/rest/listaMesajeFactura',
       'GET /prod/FCTEL/rest/listaMesajePaginatieFactura',
@@ -36,7 +36,7 @@ export const CHEAT_HEADERS: CheatHeader[] = [
   },
   {
     name: 'x-simulate-wrong-certificate',
-    description: 'Set to "true" to simulate a certificate mismatch error',
+    description: 'MOCK ONLY: Simulate a certificate mismatch error. Do not use in production.',
     endpoints: [
       'GET /prod/FCTEL/rest/listaMesajeFactura',
       'GET /prod/FCTEL/rest/listaMesajePaginatieFactura',
@@ -44,27 +44,27 @@ export const CHEAT_HEADERS: CheatHeader[] = [
   },
   {
     name: 'x-simulate-no-download-rights',
-    description: 'Set to "true" to simulate missing download rights for the invoice ZIP',
+    description: 'MOCK ONLY: Simulate missing download rights for the invoice ZIP. Do not use in production.',
     endpoints: ['GET /prod/FCTEL/rest/descarcare'],
   },
   {
     name: 'x-simulate-invalid-xml',
-    description: 'Set to "true" to simulate an invalid XML response for message status',
+    description: 'MOCK ONLY: Simulate an invalid XML response for message status. Do not use in production.',
     endpoints: ['GET /prod/FCTEL/rest/stareMesaj'],
   },
   {
     name: 'x-simulate-nok',
-    description: 'Set to "true" to force a NOK processing status for the message',
+    description: 'MOCK ONLY: Force a NOK processing status for the message. Do not use in production.',
     endpoints: ['GET /prod/FCTEL/rest/stareMesaj'],
   },
   {
     name: 'x-simulate-no-query-rights',
-    description: 'Set to "true" to simulate missing query rights for message status',
+    description: 'MOCK ONLY: Simulate missing query rights for message status. Do not use in production.',
     endpoints: ['GET /prod/FCTEL/rest/stareMesaj'],
   },
   {
     name: 'x-simulate-cui-notfound',
-    description: 'Set to "true" to force all VAT lookups to return "not found"',
+    description: 'MOCK ONLY: Force all VAT lookups to return "not found". Do not use in production.',
     endpoints: ['POST /api/PlatitorTvaRest/v9/tva'],
   },
 ];

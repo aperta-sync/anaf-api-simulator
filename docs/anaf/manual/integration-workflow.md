@@ -11,6 +11,8 @@ Step 1: Authorize   →   Step 2: Upload   →   Step 3: Poll Status   →   Ste
 
 > **Using the mock server?** All endpoints below are available at `http://localhost:3003`.  
 > Use the `X-Simulate-*` headers listed in the [Cheat Headers](#cheat-headers) section to trigger edge-case scenarios without needing real certificates or specially crafted XML.
+> 
+> **CRITICAL:** `X-Simulate-*` headers are **NOT** part of the official ANAF API. They are a feature of this mock server for local development and CI testing. **NEVER** include these headers in production code or use them in comments describing production behavior.
 
 ---
 
@@ -193,9 +195,9 @@ ANAF allows at most **10 downloads per day per specific `id`**.
 
 ## Cheat Headers
 
-All `X-Simulate-*` headers accept the string value `"true"` and are ignored on production ANAF endpoints (they are a mock-server-only feature).
+**CRITICAL:** `X-Simulate-*` headers are **NOT** part of the official ANAF API. They are a feature of this mock server for local development and CI testing. **NEVER** include these headers in production code or use them in comments describing production behavior.
 
-| Header                          | Effect                                                                    | Applies To                                                                          |
+| Header                          | Effect (MOCK ONLY - NOT FOR PRODUCTION)                                   | Applies To                                                                          |
 | :------------------------------ | :------------------------------------------------------------------------ | :---------------------------------------------------------------------------------- |
 | `x-simulate-upload-error`       | Forces a generic upload validation error (`ExecutionStatus=1`)            | `POST /upload`, `POST /uploadb2c`                                                   |
 | `x-simulate-technical-error`    | Forces a technical server error response (HTTP 500)                       | `POST /upload`, `POST /uploadb2c`                                                   |
