@@ -3,18 +3,16 @@ import { McpController } from './mcp.controller';
 
 // ── McpService mock ────────────────────────────────────────────────────────────
 
-const mockConnectSse = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
-const mockHandleMessage = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const mockHandleRequest = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
 const mockMcpService = {
-  connectSse: mockConnectSse,
-  handleMessage: mockHandleMessage,
+  handleRequest: mockHandleRequest,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function makeReq(body: unknown = {}) {
-  return { body } as any;
+function makeReq(body: unknown = {}, headers: Record<string, string> = {}) {
+  return { body, headers, get: (h: string) => headers[h] } as any;
 }
 
 function makeRes() {
@@ -35,53 +33,61 @@ describe('McpController', () => {
     controller = new McpController(mockMcpService as any);
   });
 
-  describe('GET /mcp/sse', () => {
-    it('delegates to mcpService.connectSse with /mcp/messages endpoint and res', async () => {
-      const req = makeReq();
-      const res = makeRes();
-
-      await controller.sse(req, res);
-
-      expect(mockConnectSse).toHaveBeenCalledTimes(1);
-      expect(mockConnectSse).toHaveBeenCalledWith('/mcp/messages', res);
-    });
-
-    it('propagates errors thrown by connectSse', async () => {
-      const error = new Error('SSE failed');
-      mockConnectSse.mockRejectedValueOnce(error);
-
-      await expect(controller.sse(makeReq(), makeRes())).rejects.toThrow('SSE failed');
-    });
-  });
-
-  describe('POST /mcp/messages', () => {
-    it('delegates to mcpService.handleMessage with sessionId, req, res, and body', async () => {
-      const body = { jsonrpc: '2.0', method: 'tools/list', id: 1 };
+  describe('POST /mcp', () => {
+    it('delegates to mcpService.handleRequest with req, res, and body', async () => {
+      const body = { jsonrpc: '2.0', method: 'initialize', id: 1 };
       const req = makeReq(body);
       const res = makeRes();
 
-      await controller.messages('sess-abc', req, res);
+      await controller.post(req, res);
 
-      expect(mockHandleMessage).toHaveBeenCalledTimes(1);
-      expect(mockHandleMessage).toHaveBeenCalledWith('sess-abc', req, res, body);
+      expect(mockHandleRequest).toHaveBeenCalledTimes(1);
+      expect(mockHandleRequest).toHaveBeenCalledWith(req, res, body);
     });
 
-    it('passes an empty string sessionId when query param is absent', async () => {
-      const req = makeReq({});
+    it('propagates errors thrown by handleRequest', async () => {
+      const error = new Error('transport error');
+      mockHandleRequest.mockRejectedValueOnce(error);
+
+      await expect(controller.post(makeReq(), makeRes())).rejects.toThrow('transport error');
+    });
+  });
+
+  describe('GET /mcp', () => {
+    it('delegates to mcpService.handleRequest with undefined body', async () => {
+      const req = makeReq();
       const res = makeRes();
 
-      await controller.messages(undefined as any, req, res);
+      await controller.get(req, res);
 
-      expect(mockHandleMessage).toHaveBeenCalledWith(undefined, req, res, {});
+      expect(mockHandleRequest).toHaveBeenCalledTimes(1);
+      expect(mockHandleRequest).toHaveBeenCalledWith(req, res, undefined);
     });
 
-    it('propagates errors thrown by handleMessage', async () => {
-      const error = new Error('transport error');
-      mockHandleMessage.mockRejectedValueOnce(error);
+    it('propagates errors thrown by handleRequest', async () => {
+      const error = new Error('SSE error');
+      mockHandleRequest.mockRejectedValueOnce(error);
 
-      await expect(
-        controller.messages('sess-xyz', makeReq(), makeRes()),
-      ).rejects.toThrow('transport error');
+      await expect(controller.get(makeReq(), makeRes())).rejects.toThrow('SSE error');
+    });
+  });
+
+  describe('DELETE /mcp', () => {
+    it('delegates to mcpService.handleRequest with undefined body', async () => {
+      const req = makeReq();
+      const res = makeRes();
+
+      await controller.delete(req, res);
+
+      expect(mockHandleRequest).toHaveBeenCalledTimes(1);
+      expect(mockHandleRequest).toHaveBeenCalledWith(req, res, undefined);
+    });
+
+    it('propagates errors thrown by handleRequest', async () => {
+      const error = new Error('delete error');
+      mockHandleRequest.mockRejectedValueOnce(error);
+
+      await expect(controller.delete(makeReq(), makeRes())).rejects.toThrow('delete error');
     });
   });
 });

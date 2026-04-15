@@ -85,7 +85,7 @@ async function bootstrap() {
 
   logger.log(`ANAF mock server running on port ${port}`);
   logger.log(`Swagger UI available at http://localhost:${port}/swagger`);
-  logger.log(`MCP SSE endpoint: http://localhost:${port}/mcp/sse`);
+  logger.log(`MCP endpoint: http://localhost:${port}/mcp`);
 }
 
 bootstrap();

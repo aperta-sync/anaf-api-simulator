@@ -5,28 +5,26 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 const mockConnect = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const mockServerSetRequestHandler = jest.fn();
 
-const MockServer = jest.fn().mockImplementation(() => ({
+const MockMcpServer = jest.fn().mockImplementation(() => ({
   connect: mockConnect,
-  setRequestHandler: mockServerSetRequestHandler,
+  server: { setRequestHandler: mockServerSetRequestHandler },
 }));
 
-jest.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: MockServer,
+jest.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
+  McpServer: MockMcpServer,
 }));
 
-const mockSseStart = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
-const mockHandlePostMessage = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const mockHandleTransportRequest = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 let mockSessionId = 'test-session-123';
 
-const MockSSEServerTransport = jest.fn().mockImplementation(() => ({
-  start: mockSseStart,
-  handlePostMessage: mockHandlePostMessage,
+const MockStreamableHTTPServerTransport = jest.fn().mockImplementation(() => ({
+  handleRequest: mockHandleTransportRequest,
   get sessionId() { return mockSessionId; },
   onclose: undefined as (() => void) | undefined,
 }));
 
-jest.mock('@modelcontextprotocol/sdk/server/sse.js', () => ({
-  SSEServerTransport: MockSSEServerTransport,
+jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => ({
+  StreamableHTTPServerTransport: MockStreamableHTTPServerTransport,
 }));
 
 jest.mock('@modelcontextprotocol/sdk/types.js', () => ({
@@ -520,30 +518,32 @@ describe('McpService', () => {
     });
   });
 
-  // ── connectSse ─────────────────────────────────────────────────────────────
+  // ── handleRequest ──────────────────────────────────────────────────────────
 
-  describe('connectSse()', () => {
+  describe('handleRequest()', () => {
     it('creates a transport, connects a server, and registers the session', async () => {
       service.initialize(makeEngine(), SAMPLE_SWAGGER);
+      const mockReq = { headers: {} } as any;
       const mockRes = {} as any;
 
-      await service.connectSse('/mcp/messages', mockRes);
+      await service.handleRequest(mockReq, mockRes, {});
 
-      expect(MockSSEServerTransport).toHaveBeenCalledWith('/mcp/messages', mockRes);
-      expect(MockServer).toHaveBeenCalledTimes(1);
+      expect(MockStreamableHTTPServerTransport).toHaveBeenCalledTimes(1);
+      expect(MockMcpServer).toHaveBeenCalledTimes(1);
       expect(mockConnect).toHaveBeenCalledTimes(1);
+      expect(mockHandleTransportRequest).toHaveBeenCalledWith(mockReq, mockRes, {});
     });
 
-    it('registers a fresh Server instance per SSE session', async () => {
+    it('registers a fresh McpServer instance per session', async () => {
       service.initialize(makeEngine(), SAMPLE_SWAGGER);
 
       mockSessionId = 'session-A';
-      await service.connectSse('/mcp/messages', {} as any);
+      await service.handleRequest({ headers: {} } as any, {} as any, {});
 
       mockSessionId = 'session-B';
-      await service.connectSse('/mcp/messages', {} as any);
+      await service.handleRequest({ headers: {} } as any, {} as any, {});
 
-      expect(MockServer).toHaveBeenCalledTimes(2);
+      expect(MockMcpServer).toHaveBeenCalledTimes(2);
     });
 
     it('removes the transport from the map when onclose fires', async () => {
@@ -551,80 +551,74 @@ describe('McpService', () => {
       mockSessionId = 'close-test';
 
       let capturedTransport: any;
-      MockSSEServerTransport.mockImplementationOnce(() => {
+      MockStreamableHTTPServerTransport.mockImplementationOnce(() => {
         capturedTransport = {
-          sessionId: 'close-test',
-          handlePostMessage: mockHandlePostMessage,
+          get sessionId() { return 'close-test'; },
+          handleRequest: mockHandleTransportRequest,
           onclose: undefined as (() => void) | undefined,
         };
         return capturedTransport;
       });
 
-      await service.connectSse('/mcp/messages', {} as any);
+      await service.handleRequest({ headers: {} } as any, {} as any, {});
       expect(capturedTransport.onclose).toBeDefined();
 
       // Simulate close event
       capturedTransport.onclose!();
 
-      // After close, handleMessage should report unknown session
-      const mockReq = {} as any;
+      // After close, a request with that session ID should return 404
+      const mockReq = { headers: { 'mcp-session-id': 'close-test' } } as any;
       const chunks: string[] = [];
-      const mockResForMessage = {
+      const mockResAfterClose = {
         writeHead: jest.fn(),
         end: jest.fn((data: string) => { chunks.push(data); }),
       } as any;
 
-      await service.handleMessage('close-test', mockReq, mockResForMessage, {});
+      await service.handleRequest(mockReq, mockResAfterClose, {});
 
-      expect(mockResForMessage.writeHead).toHaveBeenCalledWith(400, expect.any(Object));
+      expect(mockResAfterClose.writeHead).toHaveBeenCalledWith(404, expect.any(Object));
       expect(chunks[0]).toContain('close-test');
     });
-  });
 
-  // ── handleMessage ──────────────────────────────────────────────────────────
-
-  describe('handleMessage()', () => {
-    it('returns 400 when session does not exist', async () => {
-      const mockReq = {} as any;
+    it('returns 404 when session ID is present but unknown', async () => {
+      const mockReq = { headers: { 'mcp-session-id': 'unknown-session' } } as any;
       const mockRes = {
         writeHead: jest.fn(),
         end: jest.fn(),
       } as any;
 
-      await service.handleMessage('unknown-session', mockReq, mockRes, {});
+      await service.handleRequest(mockReq, mockRes, {});
 
-      expect(mockRes.writeHead).toHaveBeenCalledWith(400, { 'Content-Type': 'application/json' });
+      expect(mockRes.writeHead).toHaveBeenCalledWith(404, { 'Content-Type': 'application/json' });
       const body = JSON.parse(mockRes.end.mock.calls[0][0] as string);
       expect(body.error).toContain('unknown-session');
     });
 
-    it('delegates to transport.handlePostMessage for known session', async () => {
+    it('routes to existing transport when session ID is present', async () => {
       service.initialize(makeEngine(), SAMPLE_SWAGGER);
       mockSessionId = 'known-session';
 
       let capturedTransport: any;
-      MockSSEServerTransport.mockImplementationOnce(() => {
+      MockStreamableHTTPServerTransport.mockImplementationOnce(() => {
         capturedTransport = {
-          sessionId: 'known-session',
-          handlePostMessage: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+          get sessionId() { return 'known-session'; },
+          handleRequest: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
           onclose: undefined,
         };
         return capturedTransport;
       });
 
-      await service.connectSse('/mcp/messages', {} as any);
+      // First request establishes the session
+      await service.handleRequest({ headers: {} } as any, {} as any, {});
 
+      // Subsequent request routes to existing transport
       const parsedBody = { jsonrpc: '2.0', method: 'tools/list', id: 1 };
-      const mockReq = {} as any;
+      const mockReq = { headers: { 'mcp-session-id': 'known-session' } } as any;
       const mockRes = {} as any;
 
-      await service.handleMessage('known-session', mockReq, mockRes, parsedBody);
+      await service.handleRequest(mockReq, mockRes, parsedBody);
 
-      expect(capturedTransport.handlePostMessage).toHaveBeenCalledWith(
-        mockReq,
-        mockRes,
-        parsedBody,
-      );
+      expect(capturedTransport.handleRequest).toHaveBeenCalledWith(mockReq, mockRes, parsedBody);
     });
   });
 
@@ -633,7 +627,7 @@ describe('McpService', () => {
   describe('createServer() — handler registration', () => {
     it('registers handlers for ListTools, CallTool, ListResources, ReadResource', async () => {
       service.initialize(makeEngine(), SAMPLE_SWAGGER);
-      await service.connectSse('/mcp/messages', {} as any);
+      await service.handleRequest({ headers: {} } as any, {} as any, {});
 
       const registeredSchemas = mockServerSetRequestHandler.mock.calls.map(
         (call: any[]) => call[0],
@@ -650,7 +644,7 @@ describe('McpService', () => {
 
     it('also registers ListPrompts and GetPrompt handlers', async () => {
       service.initialize(makeEngine(), SAMPLE_SWAGGER);
-      await service.connectSse('/mcp/messages', {} as any);
+      await service.handleRequest({ headers: {} } as any, {} as any, {});
 
       const registeredSchemas = mockServerSetRequestHandler.mock.calls.map(
         (call: any[]) => call[0],

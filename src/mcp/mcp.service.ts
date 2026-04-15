@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - SSEServerTransport is marked as deprecated in newer SDKs, but we continue to use it here for stability.
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -162,7 +161,7 @@ const RESOURCE_FILES: Record<string, { fsPath: string; mimeType: string; name: s
 @Injectable()
 export class McpService {
   private readonly logger = new Logger(McpService.name);
-  private readonly activeTransports = new Map<string, SSEServerTransport>();
+  private readonly activeTransports = new Map<string, StreamableHTTPServerTransport>();
 
   private engine: SimulationEngineService | null = null;
   private swaggerDoc: object | null = null;
@@ -191,48 +190,50 @@ export class McpService {
     this.logger.log('McpService initialized with simulation engine and Swagger document');
   }
 
-  async connectSse(endpoint: string, res: ServerResponse): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore - SSEServerTransport is marked as deprecated in newer SDKs, but we continue to use it here for stability.
-    const transport = new SSEServerTransport(endpoint, res);
-    const sessionId = transport.sessionId;
+  async handleRequest(req: IncomingMessage, res: ServerResponse, parsedBody: unknown): Promise<void> {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
-    // Register transport BEFORE connecting to ensure it's available if the client responds immediately.
-    this.activeTransports.set(sessionId, transport);
-    this.logger.log(`MCP SSE session opening: ${sessionId} (endpoint: ${endpoint})`);
+    if (sessionId) {
+      const transport = this.activeTransports.get(sessionId);
+      if (!transport) {
+        this.logger.warn(`Rejected MCP request: No active session for ID ${sessionId}`);
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: `No active MCP session found for sessionId: ${sessionId}` }));
+        return;
+      }
+      this.logger.debug(`Routing MCP request to session ${sessionId}`);
+      await transport.handleRequest(req, res, parsedBody);
+      return;
+    }
+
+    // No session ID — initialize a new session
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+    });
+
+    transport.onclose = () => {
+      if (transport.sessionId) {
+        this.activeTransports.delete(transport.sessionId);
+        this.logger.log(`MCP session closed: ${transport.sessionId}`);
+      }
+    };
 
     const server = this.createServer();
 
     try {
       await server.connect(transport);
-      this.logger.log(`MCP SSE session connected: ${sessionId}`);
     } catch (error) {
-      this.activeTransports.delete(sessionId);
-      this.logger.error(`Failed to connect MCP server for session ${sessionId}: ${error.message}`);
+      this.logger.error(`Failed to connect MCP server: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
 
-    transport.onclose = () => {
-      this.activeTransports.delete(sessionId);
-      this.logger.log(`MCP SSE session closed: ${sessionId}`);
-    };
-  }
+    await transport.handleRequest(req, res, parsedBody);
 
-  async handleMessage(
-    sessionId: string,
-    req: IncomingMessage,
-    res: ServerResponse,
-    parsedBody: unknown,
-  ): Promise<void> {
-    const transport = this.activeTransports.get(sessionId);
-    if (!transport) {
-      this.logger.warn(`Rejected MCP message: No active session for ID ${sessionId}`);
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `No active MCP session found for sessionId: ${sessionId}` }));
-      return;
+    // Session ID is assigned during initialization; register it now so subsequent requests can be routed.
+    if (transport.sessionId) {
+      this.activeTransports.set(transport.sessionId, transport);
+      this.logger.log(`MCP session opened: ${transport.sessionId}`);
     }
-    this.logger.debug(`Handling MCP message for session ${sessionId}`);
-    await transport.handlePostMessage(req, res, parsedBody);
   }
 
   // ── Public accessors (tested directly in unit tests) ───────────────────────
@@ -529,8 +530,8 @@ export class McpService {
 
   // ── MCP Server factory ──────────────────────────────────────────────────────
 
-  private createServer(): Server {
-    const server = new Server(
+  private createServer(): McpServer {
+    const mcpServer = new McpServer(
       { name: 'anaf-mock-server', version: '1.0.0' },
       {
         capabilities: {
@@ -557,7 +558,7 @@ export class McpService {
 
     // ── ListTools ─────────────────────────────────────────────────────────────
 
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    mcpServer.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
           name: 'get_simulation_config',
@@ -696,7 +697,7 @@ export class McpService {
 
     // ── CallTool ──────────────────────────────────────────────────────────────
 
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    mcpServer.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       const toolArgs = (args ?? {}) as Record<string, unknown>;
 
@@ -766,7 +767,7 @@ export class McpService {
 
     // ── ListResources ─────────────────────────────────────────────────────────
 
-    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+    mcpServer.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       resources: [
         {
           uri: SWAGGER_RESOURCE_URI,
@@ -803,7 +804,7 @@ export class McpService {
 
     // ── ReadResource ──────────────────────────────────────────────────────────
 
-    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    mcpServer.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
 
       if (uri === SWAGGER_RESOURCE_URI) {
@@ -856,7 +857,7 @@ export class McpService {
 
     // ── ListPrompts ───────────────────────────────────────────────────────────
 
-    server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    mcpServer.server.setRequestHandler(ListPromptsRequestSchema, async () => ({
       prompts: [
         {
           name: 'anaf_integration_assistant',
@@ -867,7 +868,7 @@ export class McpService {
 
     // ── GetPrompt ─────────────────────────────────────────────────────────────
 
-    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    mcpServer.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name } = request.params;
 
       if (name === 'anaf_integration_assistant') {
@@ -904,6 +905,6 @@ export class McpService {
       throw new McpError(ErrorCode.MethodNotFound, `Unknown prompt: ${name}`);
     });
 
-    return server;
+    return mcpServer;
   }
 }
