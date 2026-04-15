@@ -195,13 +195,22 @@ export class McpService {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - SSEServerTransport is marked as deprecated in newer SDKs, but we continue to use it here for stability.
     const transport = new SSEServerTransport(endpoint, res);
+    const sessionId = transport.sessionId;
+
+    // Register transport BEFORE connecting to ensure it's available if the client responds immediately.
+    this.activeTransports.set(sessionId, transport);
+    this.logger.log(`MCP SSE session opening: ${sessionId} (endpoint: ${endpoint})`);
+
     const server = this.createServer();
 
-    await server.connect(transport);
-
-    const sessionId = transport.sessionId;
-    this.activeTransports.set(sessionId, transport);
-    this.logger.log(`MCP SSE session opened: ${sessionId}`);
+    try {
+      await server.connect(transport);
+      this.logger.log(`MCP SSE session connected: ${sessionId}`);
+    } catch (error) {
+      this.activeTransports.delete(sessionId);
+      this.logger.error(`Failed to connect MCP server for session ${sessionId}: ${error.message}`);
+      throw error;
+    }
 
     transport.onclose = () => {
       this.activeTransports.delete(sessionId);
@@ -217,10 +226,12 @@ export class McpService {
   ): Promise<void> {
     const transport = this.activeTransports.get(sessionId);
     if (!transport) {
+      this.logger.warn(`Rejected MCP message: No active session for ID ${sessionId}`);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: `No active MCP session found for sessionId: ${sessionId}` }));
       return;
     }
+    this.logger.debug(`Handling MCP message for session ${sessionId}`);
     await transport.handlePostMessage(req, res, parsedBody);
   }
 
@@ -529,6 +540,9 @@ export class McpService {
         },
         instructions:
           'ANAF e-Factura Mock Server MCP interface. ' +
+          'IMPORTANT: This server provides a SIMULATION of the ANAF API. ' +
+          'All `x-simulate-*` headers and simulation tools are for testing against this mock ONLY. ' +
+          'NEVER include `x-simulate-*` headers or mock-specific logic in production code. ' +
           'Use get_simulation_config to inspect current simulation settings, ' +
           'list_cheat_headers to discover available simulation override headers, ' +
           'get_swagger_spec to retrieve the full OpenAPI specification, ' +
@@ -876,9 +890,11 @@ export class McpService {
                   '- `generate_ubl_xml` — generate a ready-to-upload UBL invoice\n' +
                   '- `get_error_catalogue` — understand all possible Romanian error strings\n' +
                   '- `check_quota_usage` — monitor daily rate-limit consumption\n\n' +
-                  'When writing integration code, remind the user that `X-Simulate-*` headers ' +
-                  '(listed via `list_cheat_headers`) can trigger edge-case scenarios like 10 MB limits, ' +
-                  'NOK processing, or missing SPV authorization without needing special test data.',
+                  'When writing integration code, strictly distinguish between the real ANAF API behavior and the mock server simulation features.\n\n' +
+                  'WARNING: `X-Simulate-*` headers (listed via `list_cheat_headers`) are MOCK-ONLY. ' +
+                  'They MUST NOT be used in production code or comments that describe production behavior. ' +
+                  'Only use them in integration tests or local development against this mock server to trigger ' +
+                  'edge-case scenarios like 10 MB limits, NOK processing, or missing SPV authorization.',
               },
             },
           ],

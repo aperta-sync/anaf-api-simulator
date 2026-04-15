@@ -34,7 +34,8 @@ export class FaultInjectorMiddleware implements NestMiddleware {
     const isAdminRoute =
       req.path === '/' ||
       req.path.startsWith('/developer-portal') ||
-      req.path.startsWith('/simulation');
+      req.path.startsWith('/simulation') ||
+      req.path.startsWith('/mcp');
 
     if (isAdminRoute) {
       next();

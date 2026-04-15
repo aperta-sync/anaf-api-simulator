@@ -17,7 +17,10 @@ export class McpController {
 
   @Get('sse')
   async sse(@Req() req: Request, @Res() res: Response): Promise<void> {
-    await this.mcpService.connectSse('/mcp/messages', res as any);
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    await this.mcpService.connectSse(`${baseUrl}/mcp/messages`, res as any);
   }
 
   @Post('messages')
