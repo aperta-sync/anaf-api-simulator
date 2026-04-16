@@ -95,14 +95,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Prune old GHCR container versions (keep latest only)
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: ${{ github.event.repository.name }}
-          package-type: container
-          min-versions-to-keep: 2
-          delete-only-untagged-versions: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # Keep GHCR child manifests intact.
+      # Multi-platform images are published as an index manifest plus per-platform child
+      # manifests, and GHCR often stores those child manifests without tags. Deleting
+      # "untagged" package versions can therefore break pulls for tagged images.
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
