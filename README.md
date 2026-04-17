@@ -1,4 +1,4 @@
-# ANAF API Simulation Engine (Digital Twin)
+# ANAF API Simulation Engine
 
 [![CI](https://github.com/aperta-sync/anaf-api-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/aperta-sync/anaf-api-simulator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
