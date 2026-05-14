@@ -235,7 +235,7 @@ export class IssueOAuthTokenHandler implements ICommandHandler<
 
       return {
         ok: true,
-        token: this.oauthTokenService.issueToken(
+        token: await this.oauthTokenService.issueToken(
           credentials.clientId,
           identityId,
         ),
@@ -252,7 +252,7 @@ export class IssueOAuthTokenHandler implements ICommandHandler<
       };
     }
 
-    const refreshedToken = this.oauthTokenService.issueTokenFromRefreshToken(
+    const refreshedToken = await this.oauthTokenService.issueTokenFromRefreshToken(
       credentials.clientId,
       refreshToken,
     );

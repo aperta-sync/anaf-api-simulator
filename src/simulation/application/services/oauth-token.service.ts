@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { SimulationTypes } from '../../domain/simulation.types';
+import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
 
 interface OAuthTokenSession {
   clientId: string;
@@ -9,6 +10,10 @@ interface OAuthTokenSession {
   refreshToken: string;
   scope: string;
   expiresAtUnixMs: number;
+}
+
+interface OAuthTokenState {
+  sessions: OAuthTokenSession[];
 }
 
 export interface AccessTokenValidationResult {
@@ -20,7 +25,10 @@ export interface AccessTokenValidationResult {
 }
 
 /**
- * Issues and validates in-memory OAuth access and refresh token sessions.
+ * Issues and validates OAuth access and refresh token sessions.
+ *
+ * Sessions are always cached in memory for fast lookup. When Redis mode is enabled,
+ * sessions are also persisted via control-state storage so tokens survive restarts.
  */
 @Injectable()
 export class OAuthTokenService {
@@ -29,6 +37,18 @@ export class OAuthTokenService {
 
   private readonly expiresInSeconds = 3600;
   private readonly defaultScope = 'efactura vat';
+  private readonly redisStateKey = 'anaf:mock:oauth:token-sessions';
+  private stateHydrated = false;
+
+  /**
+   * Creates an instance of OAuthTokenService.
+   *
+   * @param controlStateStore Optional Redis-backed state store.
+   */
+  constructor(
+    @Optional()
+    private readonly controlStateStore?: RedisControlStateStoreService,
+  ) {}
 
   /**
    * Creates a fresh access and refresh token pair for a client.
@@ -37,15 +57,18 @@ export class OAuthTokenService {
    * @param identityId Selected mock e-sign identity identifier.
    * @returns OAuth token response payload.
    */
-  issueToken(
+  async issueToken(
     clientId: string,
     identityId: string,
-  ): SimulationTypes.OAuthTokenResponse {
-    this.purgeExpiredSessions();
+  ): Promise<SimulationTypes.OAuthTokenResponse> {
+    await this.ensureHydrated();
+    await this.purgeExpiredSessions();
 
     const session = this.createSession(clientId, identityId);
     this.accessTokenSessions.set(session.accessToken, session);
     this.refreshTokenSessions.set(session.refreshToken, session);
+
+    await this.persistState();
 
     return this.toResponse(session);
   }
@@ -57,11 +80,12 @@ export class OAuthTokenService {
    * @param refreshToken Refresh token presented by the client.
    * @returns New OAuth token response or undefined when invalid.
    */
-  issueTokenFromRefreshToken(
+  async issueTokenFromRefreshToken(
     clientId: string,
     refreshToken: string,
-  ): SimulationTypes.OAuthTokenResponse | undefined {
-    this.purgeExpiredSessions();
+  ): Promise<SimulationTypes.OAuthTokenResponse | undefined> {
+    await this.ensureHydrated();
+    await this.purgeExpiredSessions();
 
     const existing = this.refreshTokenSessions.get(refreshToken.trim());
     if (!existing || existing.clientId !== clientId.trim()) {
@@ -80,9 +104,11 @@ export class OAuthTokenService {
    * @param authorizationHeader Raw Authorization header value.
    * @returns Validation outcome with ANAF-style OAuth error details.
    */
-  validateAuthorizationHeader(
+  async validateAuthorizationHeader(
     authorizationHeader: string | undefined,
-  ): AccessTokenValidationResult {
+  ): Promise<AccessTokenValidationResult> {
+    await this.ensureHydrated();
+
     if (!authorizationHeader) {
       return {
         isValid: false,
@@ -110,8 +136,10 @@ export class OAuthTokenService {
    * @param token Bearer token value.
    * @returns Validation result with optional client identifier.
    */
-  private validateAccessToken(token: string): AccessTokenValidationResult {
-    this.purgeExpiredSessions();
+  private async validateAccessToken(
+    token: string,
+  ): Promise<AccessTokenValidationResult> {
+    await this.purgeExpiredSessions();
 
     const normalizedToken = token.trim();
     const session = this.accessTokenSessions.get(normalizedToken);
@@ -260,16 +288,64 @@ export class OAuthTokenService {
   }
 
   /**
+   * Loads persisted sessions from Redis-backed control-state store once.
+   */
+  private async ensureHydrated(): Promise<void> {
+    if (this.stateHydrated) {
+      return;
+    }
+
+    this.stateHydrated = true;
+
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    const state = await this.controlStateStore.readJson<OAuthTokenState>(
+      this.redisStateKey,
+    );
+    const sessions = state?.sessions ?? [];
+
+    for (const session of sessions) {
+      this.accessTokenSessions.set(session.accessToken, session);
+      this.refreshTokenSessions.set(session.refreshToken, session);
+    }
+
+    await this.purgeExpiredSessions();
+  }
+
+  /**
+   * Persists all active sessions when Redis control-state persistence is enabled.
+   */
+  private async persistState(): Promise<void> {
+    if (!this.controlStateStore) {
+      return;
+    }
+
+    const state: OAuthTokenState = {
+      sessions: Array.from(this.accessTokenSessions.values()),
+    };
+
+    await this.controlStateStore.writeJson(this.redisStateKey, state);
+  }
+
+  /**
    * Purges expired access and refresh sessions.
    */
-  private purgeExpiredSessions(): void {
+  private async purgeExpiredSessions(): Promise<void> {
     const now = Date.now();
+    let removed = false;
 
     for (const [accessToken, session] of this.accessTokenSessions.entries()) {
       if (session.expiresAtUnixMs <= now) {
         this.accessTokenSessions.delete(accessToken);
         this.refreshTokenSessions.delete(session.refreshToken);
+        removed = true;
       }
+    }
+
+    if (removed) {
+      await this.persistState();
     }
   }
 }
