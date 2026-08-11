@@ -58,6 +58,9 @@ grant_type=authorization_code
 
 Use the `access_token` as `Authorization: Bearer <token>` on all subsequent requests.
 
+> **Note on `expires_in`:** the `3600` shown above is illustrative only. ANAF issues
+> access tokens for 90 days, so the real value is `7776000`. See "Token lifetimes" below.
+
 ### Token Refresh
 
 When the `access_token` expires, exchange the `refresh_token` using:
@@ -65,6 +68,42 @@ When the `access_token` expires, exchange the `refresh_token` using:
 POST /anaf-oauth2/v1/token
 grant_type=refresh_token&refresh_token=<refresh_token>&client_id=...&client_secret=...
 ```
+
+### Token lifetimes
+
+| Token           | ANAF validity | Seconds    | Simulator default |
+| :-------------- | :------------ | :--------- | :---------------- |
+| `access_token`  | 90 days       | `7776000`  | matches ANAF      |
+| `refresh_token` | 365 days      | `31536000` | matches ANAF      |
+
+**Primary source:** ANAF, *Procedura de înregistrare aplicații portal ANAF*
+([static.anaf.ro](https://static.anaf.ro/static/10/Anaf/Informatii_R/API/Oauth_procedura_inregistrare_aplicatii_portal_ANAF.pdf)),
+tracked in this repo at
+`docs/anaf/scraped/technical/Oauth_procedura_inregistrare_aplicatii_portal_ANAF.pdf`:
+
+> *"Access token-ul JWT este emis pe 90 de zile, refresh token-ul este emis pe 365 de zile.
+> Folosirea refresh token-ului duce la obtinearea unui nou access token JWT."*
+
+And under *Perioada de valabilitate a parametrilor utilizati*:
+
+> *"ACCES TOKEN JWT: 129600 minute = 90 zile."*
+> *"REFRESH TOKEN JWT: 525600 minute = 365 zile"*
+
+The same section also documents a **60 second** window for obtaining a valid token
+(*"60 de secunde interval de obținere a unui token valid"*).
+
+**Rotation.** The refresh call returns *"valorile noi pentru access_token și în
+refresh_token"* — a new refresh token JWT, itself issued for 365 days. The simulator
+therefore restarts the refresh lifetime on each rotation by default. ANAF does not
+explicitly state whether the deadline is instead pinned to the original authorization,
+so `ANAF_MOCK_REFRESH_TOKEN_ROTATION=inherit` is available to model that reading and to
+exercise the forced re-authentication path.
+
+> **Drift watch.** The OAuth endpoints live on `logincert.anaf.ro` and are documented on
+> `static.anaf.ro`, neither of which is linked from the e-Factura index that
+> `scripts/anaf-scraper.mjs` crawls. The PDF above is therefore registered explicitly in
+> the scraper's `EXTRA_SOURCES` and watched by `.github/workflows/docs-sync.yml`, so a
+> change to these lifetimes raises an issue automatically.
 
 ---
 
