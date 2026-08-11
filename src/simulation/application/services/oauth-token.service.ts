@@ -9,12 +9,39 @@ interface OAuthTokenSession {
   accessToken: string;
   refreshToken: string;
   scope: string;
-  expiresAtUnixMs: number;
+  accessTokenExpiresAtUnixMs: number;
+  refreshTokenExpiresAtUnixMs: number;
+}
+
+/**
+ * Session shape persisted by versions that tracked a single expiry timestamp.
+ * Retained so Redis state written before the access/refresh split still hydrates.
+ */
+interface LegacyOAuthTokenSession
+  extends Omit<
+    OAuthTokenSession,
+    'accessTokenExpiresAtUnixMs' | 'refreshTokenExpiresAtUnixMs'
+  > {
+  expiresAtUnixMs?: number;
+  accessTokenExpiresAtUnixMs?: number;
+  refreshTokenExpiresAtUnixMs?: number;
 }
 
 interface OAuthTokenState {
-  sessions: OAuthTokenSession[];
+  sessions: LegacyOAuthTokenSession[];
 }
+
+/**
+ * Controls whether rotating a refresh token restarts its lifetime.
+ *
+ * `inherit` pins the deadline to the original authorization so a long-running refresh
+ * loop is eventually forced to re-authenticate. `reset` restarts the clock on every
+ * rotation.
+ */
+type RefreshTokenRotationMode = 'inherit' | 'reset';
+
+const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 3600;
+const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 365 * 24 * 60 * 60;
 
 export interface AccessTokenValidationResult {
   isValid: boolean;
@@ -35,7 +62,9 @@ export class OAuthTokenService {
   private readonly accessTokenSessions = new Map<string, OAuthTokenSession>();
   private readonly refreshTokenSessions = new Map<string, OAuthTokenSession>();
 
-  private readonly expiresInSeconds = 3600;
+  private readonly expiresInSeconds: number;
+  private readonly refreshTokenTtlSeconds: number;
+  private readonly refreshTokenRotationMode: RefreshTokenRotationMode;
   private readonly defaultScope = 'efactura vat';
   private readonly redisStateKey = 'anaf:mock:oauth:token-sessions';
   private stateHydrated = false;
@@ -48,7 +77,38 @@ export class OAuthTokenService {
   constructor(
     @Optional()
     private readonly controlStateStore?: RedisControlStateStoreService,
-  ) {}
+  ) {
+    this.expiresInSeconds = this.readTtlSeconds(
+      process.env.ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS,
+      DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+    );
+    this.refreshTokenTtlSeconds = this.readTtlSeconds(
+      process.env.ANAF_MOCK_REFRESH_TOKEN_TTL_SECONDS,
+      DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+    );
+    this.refreshTokenRotationMode =
+      (process.env.ANAF_MOCK_REFRESH_TOKEN_ROTATION ?? '')
+        .trim()
+        .toLowerCase() === 'reset'
+        ? 'reset'
+        : 'inherit';
+  }
+
+  /**
+   * Reads a positive TTL from configuration, falling back when unset or invalid.
+   *
+   * @param rawValue Raw environment variable value.
+   * @param fallbackSeconds Default applied when the value is missing or not positive.
+   * @returns Effective TTL in seconds.
+   */
+  private readTtlSeconds(
+    rawValue: string | undefined,
+    fallbackSeconds: number,
+  ): number {
+    const parsed = Number(rawValue);
+
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackSeconds;
+  }
 
   /**
    * Creates a fresh access and refresh token pair for a client.
@@ -64,7 +124,27 @@ export class OAuthTokenService {
     await this.ensureHydrated();
     await this.purgeExpiredSessions();
 
-    const session = this.createSession(clientId, identityId);
+    return this.createAndStoreSession(clientId, identityId);
+  }
+
+  /**
+   * Builds, stores and persists a new token session.
+   *
+   * @param clientId OAuth client identifier.
+   * @param identityId Selected mock e-sign identity identifier.
+   * @param inheritedRefreshExpiryUnixMs Refresh expiry carried over from a rotated session.
+   * @returns OAuth token response payload.
+   */
+  private async createAndStoreSession(
+    clientId: string,
+    identityId: string,
+    inheritedRefreshExpiryUnixMs?: number,
+  ): Promise<SimulationTypes.OAuthTokenResponse> {
+    const session = this.createSession(
+      clientId,
+      identityId,
+      inheritedRefreshExpiryUnixMs,
+    );
     this.accessTokenSessions.set(session.accessToken, session);
     this.refreshTokenSessions.set(session.refreshToken, session);
 
@@ -95,7 +175,17 @@ export class OAuthTokenService {
     this.accessTokenSessions.delete(existing.accessToken);
     this.refreshTokenSessions.delete(existing.refreshToken);
 
-    return this.issueToken(clientId, existing.identityId);
+    // Keep the inherited deadline across rotation unless configured to restart it.
+    const inheritedRefreshExpiryUnixMs =
+      this.refreshTokenRotationMode === 'inherit'
+        ? existing.refreshTokenExpiresAtUnixMs
+        : undefined;
+
+    return this.createAndStoreSession(
+      clientId,
+      existing.identityId,
+      inheritedRefreshExpiryUnixMs,
+    );
   }
 
   /**
@@ -143,7 +233,11 @@ export class OAuthTokenService {
 
     const normalizedToken = token.trim();
     const session = this.accessTokenSessions.get(normalizedToken);
-    if (!session) {
+
+    // Sessions outlive their access token so the refresh token stays usable, which
+    // makes this explicit expiry check — not the purge sweep — the authority on
+    // whether a bearer token is still accepted.
+    if (!session || session.accessTokenExpiresAtUnixMs <= Date.now()) {
       return {
         isValid: false,
         error: 'invalid_token',
@@ -181,9 +275,14 @@ export class OAuthTokenService {
   private createSession(
     clientId: string,
     identityId: string,
+    inheritedRefreshExpiryUnixMs?: number,
   ): OAuthTokenSession {
     const issuedAtUnixMs = Date.now();
-    const expiresAtUnixMs = issuedAtUnixMs + this.expiresInSeconds * 1000;
+    const accessTokenExpiresAtUnixMs =
+      issuedAtUnixMs + this.expiresInSeconds * 1000;
+    const refreshTokenExpiresAtUnixMs =
+      inheritedRefreshExpiryUnixMs ??
+      issuedAtUnixMs + this.refreshTokenTtlSeconds * 1000;
     const normalizedClientId = clientId.trim();
     const normalizedIdentityId = identityId.trim();
 
@@ -194,11 +293,12 @@ export class OAuthTokenService {
         normalizedClientId,
         normalizedIdentityId,
         issuedAtUnixMs,
-        expiresAtUnixMs,
+        accessTokenExpiresAtUnixMs,
       ),
       refreshToken: `refresh_${randomBytes(24).toString('base64url')}`,
       scope: this.defaultScope,
-      expiresAtUnixMs,
+      accessTokenExpiresAtUnixMs,
+      refreshTokenExpiresAtUnixMs,
     };
   }
 
@@ -306,12 +406,45 @@ export class OAuthTokenService {
     );
     const sessions = state?.sessions ?? [];
 
-    for (const session of sessions) {
+    for (const persisted of sessions) {
+      const session = this.migratePersistedSession(persisted);
       this.accessTokenSessions.set(session.accessToken, session);
       this.refreshTokenSessions.set(session.refreshToken, session);
     }
 
     await this.purgeExpiredSessions();
+  }
+
+  /**
+   * Upgrades a persisted session to the split access/refresh expiry model.
+   *
+   * Sessions written before the split carry a single `expiresAtUnixMs` describing the
+   * access token. Their refresh token is granted a full refresh TTL from now so that
+   * restarts do not silently invalidate credentials issued by an earlier version.
+   *
+   * @param persisted Session as read from control-state storage.
+   * @returns Session using the current expiry fields.
+   */
+  private migratePersistedSession(
+    persisted: LegacyOAuthTokenSession,
+  ): OAuthTokenSession {
+    const accessTokenExpiresAtUnixMs =
+      persisted.accessTokenExpiresAtUnixMs ??
+      persisted.expiresAtUnixMs ??
+      Date.now();
+    const refreshTokenExpiresAtUnixMs =
+      persisted.refreshTokenExpiresAtUnixMs ??
+      Date.now() + this.refreshTokenTtlSeconds * 1000;
+
+    return {
+      clientId: persisted.clientId,
+      identityId: persisted.identityId,
+      accessToken: persisted.accessToken,
+      refreshToken: persisted.refreshToken,
+      scope: persisted.scope,
+      accessTokenExpiresAtUnixMs,
+      refreshTokenExpiresAtUnixMs,
+    };
   }
 
   /**
@@ -322,24 +455,40 @@ export class OAuthTokenService {
       return;
     }
 
+    // A session whose access token has already been purged must still be persisted
+    // while its refresh token lives, so both maps contribute to the stored state.
+    const sessions = new Map<string, OAuthTokenSession>();
+    for (const session of [
+      ...this.accessTokenSessions.values(),
+      ...this.refreshTokenSessions.values(),
+    ]) {
+      sessions.set(session.refreshToken, session);
+    }
+
     const state: OAuthTokenState = {
-      sessions: Array.from(this.accessTokenSessions.values()),
+      sessions: Array.from(sessions.values()),
     };
 
     await this.controlStateStore.writeJson(this.redisStateKey, state);
   }
 
   /**
-   * Purges expired access and refresh sessions.
+   * Purges access and refresh tokens once their independent lifetimes elapse.
    */
   private async purgeExpiredSessions(): Promise<void> {
     const now = Date.now();
     let removed = false;
 
     for (const [accessToken, session] of this.accessTokenSessions.entries()) {
-      if (session.expiresAtUnixMs <= now) {
+      if (session.accessTokenExpiresAtUnixMs <= now) {
         this.accessTokenSessions.delete(accessToken);
-        this.refreshTokenSessions.delete(session.refreshToken);
+        removed = true;
+      }
+    }
+
+    for (const [refreshToken, session] of this.refreshTokenSessions.entries()) {
+      if (session.refreshTokenExpiresAtUnixMs <= now) {
+        this.refreshTokenSessions.delete(refreshToken);
         removed = true;
       }
     }
