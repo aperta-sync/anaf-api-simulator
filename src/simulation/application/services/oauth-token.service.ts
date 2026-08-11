@@ -34,13 +34,17 @@ interface OAuthTokenState {
 /**
  * Controls whether rotating a refresh token restarts its lifetime.
  *
- * `inherit` pins the deadline to the original authorization so a long-running refresh
- * loop is eventually forced to re-authenticate. `reset` restarts the clock on every
- * rotation.
+ * `reset` mirrors ANAF, which issues a brand new refresh token JWT on every refresh
+ * call, each valid for a further 365 days. `inherit` instead pins the deadline to the
+ * original authorization so that the forced re-authentication path can be exercised.
  */
 type RefreshTokenRotationMode = 'inherit' | 'reset';
 
-const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 3600;
+/**
+ * Token lifetimes published by ANAF in "Procedura de inregistrare aplicatii portal ANAF":
+ * "ACCES TOKEN JWT: 129600 minute = 90 zile. REFRESH TOKEN JWT: 525600 minute = 365 zile".
+ */
+const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 90 * 24 * 60 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 365 * 24 * 60 * 60;
 
 export interface AccessTokenValidationResult {
@@ -89,9 +93,9 @@ export class OAuthTokenService {
     this.refreshTokenRotationMode =
       (process.env.ANAF_MOCK_REFRESH_TOKEN_ROTATION ?? '')
         .trim()
-        .toLowerCase() === 'reset'
-        ? 'reset'
-        : 'inherit';
+        .toLowerCase() === 'inherit'
+        ? 'inherit'
+        : 'reset';
   }
 
   /**
@@ -175,7 +179,8 @@ export class OAuthTokenService {
     this.accessTokenSessions.delete(existing.accessToken);
     this.refreshTokenSessions.delete(existing.refreshToken);
 
-    // Keep the inherited deadline across rotation unless configured to restart it.
+    // ANAF issues a fresh 365 day refresh token JWT on every refresh call, so the
+    // deadline restarts unless the simulator is pinned to the original authorization.
     const inheritedRefreshExpiryUnixMs =
       this.refreshTokenRotationMode === 'inherit'
         ? existing.refreshTokenExpiresAtUnixMs

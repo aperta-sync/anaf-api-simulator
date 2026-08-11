@@ -70,6 +70,7 @@ describe('OAuthTokenService', () => {
 
   describe('refresh token lifetime', () => {
     it('keeps the refresh token usable long after the access token expires', async () => {
+      process.env.ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS = '3600';
       const service = new OAuthTokenService();
       const issued = await service.issueToken('client-1', 'identity-1');
 
@@ -145,7 +146,7 @@ describe('OAuthTokenService', () => {
       const service = new OAuthTokenService();
       const issued = await service.issueToken('client-1', 'identity-1');
 
-      advance(HOUR_MS + SECOND_MS);
+      advance(90 * DAY_MS + SECOND_MS);
 
       const result = await service.validateAuthorizationHeader(
         `Bearer ${issued.access_token}`,
@@ -160,16 +161,36 @@ describe('OAuthTokenService', () => {
       ).resolves.toBeDefined();
     });
 
-    it('reports the configured access TTL as expires_in', async () => {
+    it('reports the ANAF documented 90 day access TTL as expires_in', async () => {
       const service = new OAuthTokenService();
       const issued = await service.issueToken('client-1', 'identity-1');
 
-      expect(issued.expires_in).toBe(3600);
+      // "ACCES TOKEN JWT: 129600 minute = 90 zile."
+      expect(issued.expires_in).toBe(7776000);
     });
   });
 
   describe('refresh token rotation', () => {
-    it('inherits the original refresh expiry across rotations by default', async () => {
+    it('restarts the refresh lifetime on every rotation by default', async () => {
+      const service = new OAuthTokenService();
+      const issued = await service.issueToken('client-1', 'identity-1');
+
+      advance(360 * DAY_MS);
+      const rotated = await service.issueTokenFromRefreshToken(
+        'client-1',
+        issued.refresh_token,
+      );
+      expect(rotated).toBeDefined();
+
+      // Past the original 365 day window, but the restarted clock keeps it alive.
+      advance(100 * DAY_MS);
+      await expect(
+        service.issueTokenFromRefreshToken('client-1', rotated!.refresh_token),
+      ).resolves.toBeDefined();
+    });
+
+    it('pins the refresh expiry to the original authorization when configured to inherit', async () => {
+      process.env.ANAF_MOCK_REFRESH_TOKEN_ROTATION = 'inherit';
       const service = new OAuthTokenService();
       const issued = await service.issueToken('client-1', 'identity-1');
 
@@ -201,25 +222,6 @@ describe('OAuthTokenService', () => {
           stillValid!.refresh_token,
         ),
       ).resolves.toBeUndefined();
-    });
-
-    it('resets the refresh expiry on rotation when configured to do so', async () => {
-      process.env.ANAF_MOCK_REFRESH_TOKEN_ROTATION = 'reset';
-      const service = new OAuthTokenService();
-      const issued = await service.issueToken('client-1', 'identity-1');
-
-      advance(360 * DAY_MS);
-      const rotated = await service.issueTokenFromRefreshToken(
-        'client-1',
-        issued.refresh_token,
-      );
-      expect(rotated).toBeDefined();
-
-      // Well past the original window, but the reset clock keeps it alive.
-      advance(100 * DAY_MS);
-      await expect(
-        service.issueTokenFromRefreshToken('client-1', rotated!.refresh_token),
-      ).resolves.toBeDefined();
     });
   });
 
@@ -255,7 +257,7 @@ describe('OAuthTokenService', () => {
       const service = new OAuthTokenService();
       const issued = await service.issueToken('client-1', 'identity-1');
 
-      expect(issued.expires_in).toBe(3600);
+      expect(issued.expires_in).toBe(7776000);
 
       advance(200 * DAY_MS);
       await expect(
@@ -266,6 +268,7 @@ describe('OAuthTokenService', () => {
 
   describe('redis-backed persistence', () => {
     it('persists sessions whose access token has expired but whose refresh token is still valid', async () => {
+      process.env.ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS = '3600';
       const store = createFakeStore();
       const service = new OAuthTokenService(store as never);
       const issued = await service.issueToken('client-1', 'identity-1');
