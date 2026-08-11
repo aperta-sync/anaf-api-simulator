@@ -27,6 +27,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      # Required by the scraper to turn tracked PDFs into diffable text extracts.
+      - name: Install poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
       - name: Run Scraper
         env:
           ANAF_NOTIFIER_WEBHOOK: ${{ secrets.ANAF_NOTIFIER_WEBHOOK }}
@@ -37,21 +41,30 @@ jobs:
           B2_REGION: ${{ vars.B2_REGION }}
         run: node scripts/anaf-scraper.mjs
 
-      - name: Check for Swagger Changes
+      - name: Check for Spec Changes
         id: git-check
+        env:
+          # Swagger covers the e-Factura REST surface. The OAuth document is tracked
+          # separately because the OAuth endpoints live on logincert.anaf.ro and are
+          # documented on static.anaf.ro, so nothing links them from the e-Factura index.
+          # Watch the .txt extract, not the .pdf — PDFs are gitignored and would never
+          # show up in git status, and a binary diff would be unreadable anyway.
+          WATCH_PATHS: >-
+            docs/anaf/scraped/technical/swagger/
+            docs/anaf/scraped/technical/Oauth_procedura_inregistrare_aplicatii_portal_ANAF.txt
         run: |
-          git status --porcelain docs/anaf/scraped/technical/swagger/
-          if [ -n "$(git status --porcelain docs/anaf/scraped/technical/swagger/)" ]; then
+          git status --porcelain -- $WATCH_PATHS
+          if [ -n "$(git status --porcelain -- $WATCH_PATHS)" ]; then
             echo "changes=true" >> $GITHUB_OUTPUT
-            
+
             # Create a summary of changed files for the issue body
-            git status --porcelain docs/anaf/scraped/technical/swagger/ > changes.txt
+            git status --porcelain -- $WATCH_PATHS > changes.txt
             echo "CHANGED_FILES<<EOF" >> $GITHUB_ENV
             cat changes.txt >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
-            
+
             # Capture the actual diff to show what exactly changed
-            git diff docs/anaf/scraped/technical/swagger/ > diff.txt
+            git diff -- $WATCH_PATHS > diff.txt
             echo "SPEC_DIFF<<EOF" >> $GITHUB_ENV
             cat diff.txt >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
@@ -66,7 +79,10 @@ jobs:
         run: |
           gh issue create \
             --title "🚨 ANAF API Update Detected" \
-            --body "The automated scraper detected changes to the official ANAF OpenAPI specifications. 
+            --body "The automated scraper detected changes to the official ANAF specifications (OpenAPI and/or the OAuth registration procedure).
+
+            **If \`Oauth_procedura_inregistrare_aplicatii_portal_ANAF.txt\` changed**, re-check the token lifetimes in section *Perioada de valabilitate a parametrilor utilizati* against \`src/simulation/application/services/oauth-token.service.ts\` (\`DEFAULT_ACCESS_TOKEN_TTL_SECONDS\`, \`DEFAULT_REFRESH_TOKEN_TTL_SECONDS\`).
+
             
             **Changed Files:**
             \`\`\`

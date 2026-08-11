@@ -3,6 +3,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { execFileSync } from 'child_process';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 
 /**
@@ -29,6 +30,24 @@ if (process.env.B2_ACCESS_KEY_ID && process.env.B2_SECRET_ACCESS_KEY && process.
 }
 
 const SWAGGER_SOURCES = [];
+
+/**
+ * Sources that are NOT linked from INDEX_URL and would otherwise never be crawled.
+ *
+ * The OAuth surface lives on logincert.anaf.ro and is documented on static.anaf.ro,
+ * neither of which is reachable from the mfinante e-Factura index. Without this list
+ * the token lifetimes and OAuth registration flow drift silently.
+ */
+const EXTRA_SOURCES = [
+  {
+    url: 'https://static.anaf.ro/static/10/Anaf/Informatii_R/API/Oauth_procedura_inregistrare_aplicatii_portal_ANAF.pdf',
+    name: 'Oauth_procedura_inregistrare_aplicatii_portal_ANAF.pdf',
+    folder: 'technical',
+    // PDFs are gitignored, so the parity check watches this text extract instead.
+    // A binary hash only says "something changed"; the extract shows which numbers did.
+    extractTextTo: 'technical/Oauth_procedura_inregistrare_aplicatii_portal_ANAF.txt',
+  },
+];
 
 const CONFIG = {
   headers: {
@@ -167,13 +186,21 @@ async function runScraper() {
       discoveredLinks.add(source.url);
     }
 
+    for (const source of EXTRA_SOURCES) {
+      discoveredLinks.add(source.url);
+    }
+
     for (const url of discoveredLinks) {
       const swaggerSource = SWAGGER_SOURCES.find(s => s.url === url);
-      const filename = swaggerSource ? swaggerSource.name : path.basename(url);
-      
+      const extraSource = EXTRA_SOURCES.find(s => s.url === url);
+      const filename =
+        swaggerSource?.name ?? extraSource?.name ?? path.basename(url);
+
       let folder;
       if (swaggerSource) {
         folder = 'technical/swagger';
+      } else if (extraSource) {
+        folder = extraSource.folder;
       } else if (url.toLowerCase().endsWith('.html')) {
         folder = 'technical/endpoints';
       } else {
@@ -272,6 +299,21 @@ async function runScraper() {
         }
         state[url] = { etag, lastModified, hash: newHash, downloadedAt: new Date().toISOString(), b2Uploaded: b2Success };
         // -----------------
+
+        // --- Extract plain text from tracked PDFs ---
+        // Keeps a diffable, committed record of documents whose binaries are gitignored.
+        if (extraSource?.extractTextTo) {
+          const textPath = path.join(BASE_DIR, extraSource.extractTextTo);
+          const textDir = path.dirname(textPath);
+          if (!fs.existsSync(textDir)) fs.mkdirSync(textDir, { recursive: true });
+
+          try {
+            execFileSync('pdftotext', ['-enc', 'UTF-8', targetPath, textPath]);
+            console.log(`    └─ Extracted text to ${path.basename(textPath)}`);
+          } catch (extractError) {
+            console.log(`    └─ ⚠️ Text extraction failed (is poppler-utils installed?): ${extractError.message}`);
+          }
+        }
 
         // --- Extract OpenAPI Spec from HTML ---
         if (url.toLowerCase().endsWith('.html')) {
