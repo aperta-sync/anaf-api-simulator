@@ -18,11 +18,18 @@ export interface ConsumedAuthorizationCodeGrant {
 }
 
 /**
- * Authorization code lifetime. ANAF has not published this value; see issue #12.
- * The 60 second window its registration procedure documents under
- * "Perioada de valabilitate a parametrilor utilizati" describes a connection reset
- * and may or may not bound the code exchange, so the previous default is kept until
- * the semantics are confirmed against a live authorization flow.
+ * Authorization code lifetime, matching ANAF's inferred F5 BIG-IP APM configuration.
+ *
+ * ANAF's OAuth server is F5 BIG-IP APM: its OIDC discovery document at
+ * logincert.anaf.ro serves revoke, introspect and userinfo from /f5-oauth2/v1/ paths.
+ * F5 expresses OAuth lifetimes in minutes, and the values ANAF publishes are quoted in
+ * exactly those units — "ACCES TOKEN JWT: 129600 minute", "REFRESH TOKEN JWT: 525600
+ * minute" — i.e. its overridden jwt-access-token-lifetime and jwt-refresh-token-lifetime.
+ * auth-code-lifetime is absent from that list, indicating it is left at the F5 default
+ * of 5 minutes, which is what this value mirrors.
+ *
+ * The separate "60 de secunde" entry in the same section describes a connection reset
+ * during token acquisition, not the code exchange window. See issue #12.
  */
 const DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS = 5 * 60;
 
