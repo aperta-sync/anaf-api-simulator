@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { SimulationTypes } from '../../domain/simulation.types';
 import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
+import { readTtlSeconds } from './ttl-config';
 
 interface OAuthTokenSession {
   clientId: string;
@@ -82,11 +83,11 @@ export class OAuthTokenService {
     @Optional()
     private readonly controlStateStore?: RedisControlStateStoreService,
   ) {
-    this.expiresInSeconds = this.readTtlSeconds(
+    this.expiresInSeconds = readTtlSeconds(
       process.env.ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS,
       DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
     );
-    this.refreshTokenTtlSeconds = this.readTtlSeconds(
+    this.refreshTokenTtlSeconds = readTtlSeconds(
       process.env.ANAF_MOCK_REFRESH_TOKEN_TTL_SECONDS,
       DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
     );
@@ -96,22 +97,6 @@ export class OAuthTokenService {
         .toLowerCase() === 'inherit'
         ? 'inherit'
         : 'reset';
-  }
-
-  /**
-   * Reads a positive TTL from configuration, falling back when unset or invalid.
-   *
-   * @param rawValue Raw environment variable value.
-   * @param fallbackSeconds Default applied when the value is missing or not positive.
-   * @returns Effective TTL in seconds.
-   */
-  private readTtlSeconds(
-    rawValue: string | undefined,
-    fallbackSeconds: number,
-  ): number {
-    const parsed = Number(rawValue);
-
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackSeconds;
   }
 
   /**

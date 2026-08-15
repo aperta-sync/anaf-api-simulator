@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { SimulationTypes } from '../../domain/simulation.types';
 import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
+import { readTtlSeconds } from './ttl-config';
 
 interface AuthorizationCodeGrant {
   code: string;
@@ -68,13 +69,10 @@ export class MockApplicationRegistryService implements OnModuleInit {
     private readonly controlStateStore?: RedisControlStateStoreService,
   ) {
     // Nest manages lifecycle for injected services.
-    const configured = Number(
+    this.authorizationCodeTtlSeconds = readTtlSeconds(
       process.env.ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS,
+      DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS,
     );
-    this.authorizationCodeTtlSeconds =
-      Number.isFinite(configured) && configured > 0
-        ? configured
-        : DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS;
   }
 
   /**
