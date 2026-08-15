@@ -18,6 +18,15 @@ export interface ConsumedAuthorizationCodeGrant {
 }
 
 /**
+ * Authorization code lifetime. ANAF has not published this value; see issue #12.
+ * The 60 second window its registration procedure documents under
+ * "Perioada de valabilitate a parametrilor utilizati" describes a connection reset
+ * and may or may not bound the code exchange, so the previous default is kept until
+ * the semantics are confirmed against a live authorization flow.
+ */
+const DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS = 5 * 60;
+
+/**
  * Stores mock OAuth applications and short-lived authorization codes.
  */
 @Injectable()
@@ -33,6 +42,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
     string,
     AuthorizationCodeGrant
   >();
+  private readonly authorizationCodeTtlSeconds: number;
 
   /**
    * Seeds an environment-defined OAuth client at startup when configured.
@@ -51,6 +61,13 @@ export class MockApplicationRegistryService implements OnModuleInit {
     private readonly controlStateStore?: RedisControlStateStoreService,
   ) {
     // Nest manages lifecycle for injected services.
+    const configured = Number(
+      process.env.ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS,
+    );
+    this.authorizationCodeTtlSeconds =
+      Number.isFinite(configured) && configured > 0
+        ? configured
+        : DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS;
   }
 
   /**
@@ -286,7 +303,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
       clientId: clientId.trim(),
       redirectUri: redirectUri.trim(),
       identityId: identityId.trim(),
-      expiresAt: Date.now() + 5 * 60 * 1000,
+      expiresAt: Date.now() + this.authorizationCodeTtlSeconds * 1000,
     };
 
     this.authorizationCodes.set(code, grant);
