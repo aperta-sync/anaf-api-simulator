@@ -1,0 +1,545 @@
+Cuprins
+DESCRIERE TEHNICA ......................................................................................................... 1
+INREGISTRAREA PENTRU API-URI ...................................................................................... 5
+Creare cont nou de utilizator .................................................................................................... 6
+Utilizatorul are un cont pe portalul ANAF ................................................................................ 10
+Recuperare credentiale/parola ............................................................................................... 12
+
+AUTENTIFICARE .............................................................................................................. 13
+INREGISTRARE APLICATIE PROFIL OAUTH ........................................................................ 16
+Prezentare Aplicatie profil OAUTH .......................................................................................... 16
+Gestionare aplicatii ................................................................................................................ 16
+Istoric .................................................................................................................................... 19
+Renuntare OAUTH .................................................................................................................. 20
+
+TOKEN OAUTH ................................................................................................................ 23
+Obtinerea tokenului de acces de tip JWT................................................................................. 23
+Refresh Token JWT ................................................................................................................. 29
+
+LISTA SERVICII DE TIP API DEZVOLTATE DE ANAF PROFIL OAUTH ...................................... 30
+Serviciul web pentru sistemul national privind facture electronica RO e-Factura .............. 30
+Serviciul web pentru sistemul electronic integrat RO e-Transport ............................................ 30
+Serviciul web de test “TestOauth”........................................................................................... 31
+
+ALTE INFORMATII TEHNICE .............................................................................................. 33
+Perioada de valabilitate a parametrilor utilizati .............................................................. 33
+Mesajele care se pot obtine la apelul serviciilor web ............................................................... 33
+Limite accesari api.anaf.ro ...................................................................................................... 33
+
+ASISTENTA TEHNICA ....................................................................................................... 34
+
+DESCRIERE TEHNICA
+Pentru integrarea serviciilor ANAF expuse în Internet, cu aplicații terțe,
+web/desktop/mobile, s-a implementat o soluție de autorizare a accesului la
+serviciile de tip API, dezvoltate de ANAF, folosind mecanisme standard bazate pe
+folosirea protocolului OAUTH. Această soluție este destinată dezvoltatorilor de
+aplicații. Sunt necesare cunoștințe de IT și de protocol Oauth 2.0. Este necesară
+dezvoltarea unei aplicații pentru folosirea acestei soluții.
+Pentru acest lucru s-au definit două servicii expuse în Internet, cu
+următoarele roluri:
+– logincert.anaf.ro – serviciu de tip “Identity Provider” - IdP, ce facilitează
+obținerea unor token-uri de acces folosite pentru autorizarea accesului la
+servicii de tip API. Obținerea se face prin autentificarea utilizatorului folosind
+certificate digitale calificate.
+– api.anaf.ro – serviciu protejat ce expune API-uri care necesită acces autorizat
+pe bază de token-uri de acces.
+Schema după care funcționează soluția este prezentată in figura următoare:
+
+1
+
+Pașii pentru utilizarea soluției sunt următorii:
+ Utilizatorul înregistrat pe portalul ANAF cu certificat digital calificat cu unul din
+drepturile de SPV PJ (reprezentant legal, reprezentant desemnat, imputernicit)
+accesează o aplicație terță. Aceasta poate să fie:
+1. o aplicație de tip mobile, nativă Android/IOS,
+2. o aplicație de tip desktop sau
+3. o aplicație de tip web (site web)
+ Prin intermediul aplicației terțe utilizatorul este redirecționat către IdP,
+logincert.anaf.ro, pentru autentificare și obținerea token-ului de autorizare.
+Autentificarea se face folosind certificatul digital calificat al utilizatorului
+înregistrat pe portalul ANAF cu unul din drepturile de SPV PJ (reprezentant legal,
+reprezentant desemnat, imputernicit). Pentru înregistrarea în SPV accesați linkul: https://www.anaf.ro/InregPersFizicePublic/#tabs-2. În pasul de generare al
+token-ului se iau în considerare două lucruri:
+1. Drepturile de acces ale utilizatorului definite de serialul certificatului
+înrolat în sistemele ANAF cu unul din drepturile de SPV PJ (reprezentant
+legal, reprezentant desemnat, imputernicit);
+2. Drepturile de acces ale aplicatiei terțe către serviciile expuse de ANAF.
+ IdP-ul returnează aplicației terțe un token de autorizare pe baza drepturilor
+aplicației și a utilizatorului
+1. Dacă utilizatorul nu are acces la serviciu dar aplicația terță are, IdP-ul va
+returna un token care nu-i va permite utilizatorului să acceseze seviciul
+respectiv;
+2. Dacă utilizatorul are acces la serviciu dar aplicația terță nu a fost înrolată
+la serviciul respectiv, IdP-ul va returna un token care nu-i va permite
+utilizatorului să acceseze serviciului prin intermediul acelei aplicații;
+3. Dacă utilizatorul are acces la serviciu și aplicația terță a fost înrolată
+corect pentru serviciul respectiv, IdP-ul va returna un token ce-i permite
+utilizatorului să acceseze serviciul protejat prin aplicația utilizată;
+
+2
+
+4. Orice token furnizat de IdP permite accesul cel puțin spre serviciul de
+testare de tip “Hello”, denumit TestOauth. Serviciul “Hello” va fi
+customizat pe viitor pentru a afișa mai multe informații.
+ Aplicația terță accesează o resursă protejată aflată în spatele serviciului
+api.anaf.ro folosind token-ul obținut la pasul 3;
+ Resursa protejată, api.anaf.ro, autorizează accesul către API-uri folosind un
+mecanism de validare la IdP al token-ului prezentat;
+ IdP-ul valideaza token-ul prezentat;
+ Resursa protejată permite accesul către API-ul accesat.
+Token-urile emise de către IdP sunt de tip “authorization code”, JWT cu o durată
+de valabilitate mare, care pot fi ulterior folosite de către aplicații terțe. Token-ul
+JWT poat fi decodat si contine informatii despre aplicatie, utilizator si nivelul de
+acces pentru utilizator. Responsabilitatea păstrarii în mod securizat a token-urilor
+revine dezvoltatorilor de aplicații care folosesc acest mecanism.
+Aplicația terță poate să stocheze în mod securizat token-ul obținut de utilizator
+pentru refolosiri ulterioare. Modul în care se tratează managementul token-urilor
+depinde de fiecare aplicație în parte și de modul în care a fost construită.
+Managementul token-urilor se face folosind mecanismele standard puse la dispoziție
+de OAuth2.0.
+URL-urile de management sunt:
+Authorization Endpoint
+
+https://logincert.anaf.ro/anaf-oauth2/v1/authorize
+
+Token Issuance Endpoint
+
+https://logincert.anaf.ro/anaf-oauth2/v1/token
+
+Ldap-ul returnează un set format din două token-uri, unul de autorizare
+(Authorizarion Token) si unul de refresh (Refresh Token). Refresh token-ul poate fi
+folosit pentru obținerea unui nou Authorization Token. Ambele pot fi reutilizate.
+
+3
+
+Pentru folosirea soluției de autorizare a accesului la serviciile de tip API,
+dezvoltate de ANAF, folosind mecanisme standard bazate pe folosirea protocolului
+OAUTH, dezvoltatorii de aplicații au la dispoziție un mecanism de înrolare a
+aplicațiilor în sistemele ANAF. Utilizatorii aplicațiilor trebuie să fie înregistrați și
+înrolați în sistemele ANAF, cu drepturi de acces către diverse servicii furnizate de
+portalul ANAF.
+
+4
+
+INREGISTRAREA PENTRU API-URI
+În
+
+contextul
+
+OAUTH
+
+dezvoltatorul
+
+unei
+
+aplicații
+
+software
+
+(mobile/web/desktop) este identificat cu un "client app id". Utilizatorii acelei
+aplicații sunt identificați în cazul sistemelor e-Factura sau e-Transport prin serialul
+certificatului digital calificat folosit pentru obținerea token-ului Oauth.
+Token-urile, atât cel de acces cât și cel de refresh, sunt generate pentru acel
+certificat digital, și identifică utilizatorul aplicației, nu aplicația în sine. El este
+asociat unei aplicații, însă acest lucru nu are nicio relevanță pentru identificarea
+utilizatorului. Toți utilizatorii ajung în același api.anaf.ro (serviciu protejat ce
+expune API-uri care necesită acces autorizat pe bază de token-uri de acces), fiecare
+utilizator este autorizat de un token asociat serialului certificatului folosit și
+aplicației folosite.
+Din punct de vedere al securității este fundamental ca dezvoltatorul software
+să fie identificat unic printr-un client id și nu utilizatorii. Aplicația disponibilă la
+URL-ul www.anaf.ro/InregOauth este destinată doar dezvoltatorilor de aplicații.
+Utilizatorii înregistrați în SPV nu trebuie să își creeze cont prin intermediul acestei
+aplicații, decât dacă sunt și dezvoltatori software și au de înregistrat o aplicație
+software ce va folosi serviciile electronice puse la dispoziție în cadrul portalului
+ANAF.
+De asemenea, în interfața disponibilă dezvoltatorilor de aplicații, după
+autentificare, se vor declara aplicațiile web dezvoltate de către dezvoltatori.
+Pentru înregistrarea utilizatorilor care vor înregistra la rândul lor aplicații ce
+vor folosi soluția de autorizare a accesului la serviciile de tip API disponibile pe
+portalului ANAF, se accesează portalul https://anaf.ro, secțiunea: Servicii
+Online>Inregistrare utilizatori>DEZVOLTATORI APLICAȚII
+
+5
+
+Această secțiune pune la dispoziție două servicii:
+– Înregistrare pentru API-uri
+– Instrucțiuni de utilizare
+Pentru înregistrarea utilizatorilor ce vor înregistra la rândul lor aplicațiile ce
+vor utiliza soluția de autorizare a accesului la serviciile de tip API, dezvoltate de
+ANAF, folosind mecanisme standard bazate pe folosirea protocolului OAUTH, se
+accesează link-ul “Înregistrare pentru API-uri”>
+Aici exista două situații:
+1. Utilizatorul nu are niciun cont pe portalul ANAF.
+2. Utilizatorul are un cont cu username și parolă pe portalul
+ANAF. In cazul unui cont cu certificat digital urmați instrucțiunile
+de la pasul 1.
+
+Creare cont nou de utilizator
+Pentru înregistrarea unui cont nou de utilizator se selectează secțiunea “Înregistrare
+pentru API-uri” în formularul web care se afișează:
+
+6
+
+7
+
+Se completează datele aferente utilizatorului în formularul web care se afișează.
+
+8
+
+Se apasă butonul „Continuă”.
+Utilizatorul va primi pe e-mail codul de verificare a adresei de e-mail.
+
+La „Cod de verificare” se va introduce codul primit pe e-mail.
+
+Se apasă butonul „Continuă”.
+Utilizatorul va primi mesajul de succes:
+
+9
+
+Utilizatorul are un cont pe portalul ANAF
+În situația în care utilizatorul are un cont de utilizator pe portalul ANAF,
+procedează în felul următor: accesează și completează informațiile din
+macheta de mai jos.
+
+Înregistrare cu un cont existent de portal/SPV:
+
+10
+
+Se completează datele aferente utilizatorului în formularul web care se afișează.
+
+Se apasă butonul „Continuă”.
+Utilizatorul va primi pe e-mail, codul de verificare a adresei de e-mail.
+
+La „Cod de verificare” se va introduce codul primit pe e-mail.
+
+Se apasă butonul „Continuă”.
+
+Utilizatorul va primi mesajul de succes:
+
+11
+
+După parcurgerea pașilor de înregistrare ce au ca scop final înregistrarea
+aplicațiilor terțe ce vor folosi soluția de autorizare a accesului la serviciile de tip API
+disponibile pe portalului ANAF, pași diferențiați în funcție de situația daca
+utilizatorul are sau nu cont pe portalul ANAF, se accesează butonul ”Autentificare
+utilizator”:
+Autentificare utilizator
+
+Recuperare credentiale/parola
+În situația în care utilizatorul dorește recuperarea credențialelor/parolei
+procedează în felul următor: accesează secțiunea “ Recuperare credențiale/parolă
+“ și completează informațiile din macheta de mai jos.
+
+12
+
+Se completează CNP și email utilizator :
+
+AUTENTIFICARE
+
+13
+
+Se introduc numele și parola:
+
+Click pe butonul „Autentificare”>
+
+14
+
+Click pe meniul “Editare profil Oauth”
+Se ajunge în aplicația „Editare profil Oauth”>
+
+15
+
+INREGISTRARE APLICATIE PROFIL OAUTH
+Prezentare Aplicatie profil OAUTH
+Aplicația are disponibile următoarele servicii:
+
+- Gestionare aplicații
+- Istoric
+- Renuntare Oauth
+
+Gestionare aplicatii
+Se completează datele în formularul web care se afișează:
+1.
+
+Denumirea aplicației ce se va înregistra;
+
+2.
+
+Se selectează serviciul oferit de portalul ANAF, dintr-un nomenclator de servicii.
+Sunt puse la dispoziție următoarele servicii:
+
+
+E-Factura (Servicii web pentru Sistemul national privind factura
+electronica
+RO e-Factura)
+
+
+
+E-Transport (Servicii web pentru Sistemul electronic integrat RO eTransport)
+
+16
+
+Mai jos exemplificăm pentru serviciul de factură electronică, cu mențiunea
+că in același fel se procedează și pentru restul serviciilor ce există în cadrul acestui
+nomenclator, dacă se dorește utilizarea acestora.
+
+* În cazul în care folosiți utilitarul POSTMAN, se va trece Url-ul
+https://oauth.pstmn.io/v1/callback (Url folosit pentru
+autentificarea cu
+browserul)
+
+17
+
+Se apasă butonul „Generare Client ID”>
+
+Valori pentru obținerea tokenului Oauth>
+Pentru a vedea detaliile aferente valorilor pentru obținerea tokenului Oauth se dă
+click pe înregistrarea aferentă aplicației inregistrată:
+
+18
+
+Se afișează informațiile referitoare la câmpurile:
+Grant Type:
+Callback URL:
+Auth URL:
+Client ID:
+Client Secret:
+
+Istoric
+Pentru a vedea istoricul operatiunilor efectuate, din meniu se selectează serviciul
+„Istoric”:
+
+19
+
+Istoric
+
+Renuntare OAUTH
+În situația în care se dorește renuntarea la serviciul Oauth, din meniu se selectează
+serviciul „Renunțare Oauth”:
+
+20
+
+Renunțare Oauth
+
+Se selectează aplicația care se dorește a se șterge:
+
+Se apasă butonul “Șterge aplicația”>
+
+21
+
+Confirmare ștergere>
+
+Mesajul de succes>
+
+22
+
+TOKEN OAUTH
+Obtinerea tokenului de acces de tip JWT
+În momentul în care este înregistrată aplicația, aceasta se va conecta, utilizând
+valorile obținute. În interfața dezvoltată se vor utiliza informațiile rezultate în urma
+procesului de înrolare a aplicației, după cum urmează:
+1. Client ID
+2. Client Secret
+3. Callback URL (Redirect URI) disponibil
+Se vor avea în vedere următoarele configurări/setari pentru obtinerea tokenului de
+acces:
+– Type: OAuth 2.0
+– Add Authorization Data to: Request Headers
+– Grant Type: Authorization Code
+– Callback URL: configurat de client la înrolarea aplicației
+– URL-ul pentru autorizare: https://logincert.anaf.ro/anaf-oauth2/v1/authorize
+– Client ID: obtinut de client la inrolarea aplicatiei
+– Client Secret: obtinut de client la inrolarea aplicatiei
+– Client Authentication de tipul: Send as Basic Auth header
+Atașăm o captură de ecran pentru obținerea tokenului de acces OAUTH, folosind
+utilitarul POSTMAN varianta Desktop(o versiune cat mai recenta). Scope se lasa
+necompletat. State se lasa necompletat.
+Vă rugăm să completați câmpurile întocmai ca în captura de mai jos. Nu
+completați câmpurile care sunt goale în captura de ecran.
+
+23
+
+Se face expand la Advanced si se completeaza urmatoarele campuri:
+-
+
+Auth Request, Key=token_content_type, Value=jwt
+
+-
+
+Token Request, Key=token_content_type, Value=jwt, Send In=Request Body
+
+24
+
+Cei doi parametrii token_content_type=jwt se trimit odata pe Query pentru
+requestul de Authorizare si in corpul requestului (Request Body) pentru requestul de
+obtinere al token-ului.
+După apăsarea butonului “Get New Access Token” se va prezenta certificatul digital
+cu rol SPV PJ
+
+25
+
+26
+
+27
+
+Token-ul de tip JWT contine informatia necesara procesarii. Informatiile din token
+pot fi verificate folosind orice tool online de decodare a token-urilor de tip JWT,
+cum ar fi https://jwt.io :
+
+La finalul token-ului se pot vedea si data la care s-a emis token-ul, iss, data de
+expirare, exp.
+
+28
+
+Access token-ul JWT este emis pe 90 de zile, refresh token-ul este emis pe 365
+de zile. Folosirea refresh token-ului duce la obtinearea unui nou access token JWT.
+Access token-ul JWT este semnat digital, validarea lui la procesare se face prin
+verificarea criptografica a semnaturii. Manipularea token-ului duce la invalidarea
+acestuia si imposibilitatea utilizarii lui in continuare. Utilizatorii sunt
+responsabili de manipularea in mod securizat a token-urilor si de eventuala
+pierdere sau interceptare a lor de catre utilizatori neautorizati.
+Token-ul obținut este folosit pentru autorizarea în serviciile API puse la dispoziție
+pentru care s-a solicitat înregistrarea aplicației.
+Cu token-ul generat se acceseaza serviciul web aferent.
+
+Refresh Token JWT
+Pentru obtinrea unui access token folosind doar refresh token-ul se poate fie utiliza
+functia automata de refresh din POSTMAN sau se executa un call de tip POST catre
+https://logincert.anaf.ro/anaf-oauth2/v1/token cu urmatoarele caracteristici:
+- Basic Authentication completat cu client id si client secret folosit
+- Requestul trimis sub forma x-www-form-urlencoded cu doi parametrii
+completati:
+o refresh_token cu valoarea refresh token-ului obtinut în urma solicitării
+tokenului de acces pentru care se face refresh. Valoarea refresh tokenului se poate gasi în sectiunea Available Tokens – Manage Tokens din
+Postman.
+o grant_type cu valoarea refresh_token
+
+Clientul este responsabil de gestionarea token-urilor JWT si de a se asigura ca nu
+sunt accesibile personelor care nu au nevoie de acces la ele.
+In cazul unei probleme de securitate la client in care token-urile folosite sunt
+compromise e nevoie ca ele sa fie trimise ANAF-ului pentru a bloca accesul lor in
+sistem.
+Urmare a apelului, se obține rezultatul 200 OK. În Body se găsesc valorile noi pentru
+access_token și în refresh_token. Acestea trebuiesc salvate pentru a putea fi folosite
+in continuare.
+
+29
+
+LISTA SERVICII DE TIP API DEZVOLTATE DE ANAF PROFIL OAUTH
+Serviciul web pentru sistemul national privind facture electronica RO
+e-Factura
+Mediul de test:
+Pentru detalii tehnice, accesați URL-ul:
+https://mfinante.gov.ro/static/10/eFactura/prezentare%20api%20efactura.pdf
+disponibil în cadrul paginii web:
+https://mfinante.gov.ro/ro/web/efactura/informatii-tehnice
+Mediul de producție:
+Pentru detalii tehnice, accesaţi URL-ul:
+https://mfinante.gov.ro/static/10/eFactura/prezentare%20api%20efactura.pdf
+disponibil în cadrul paginii web:
+https://mfinante.gov.ro/ro/web/efactura/informatii-tehnice
+
+Serviciul web pentru sistemul electronic integrat RO e-Transport
+Mediul de test:
+https://api.anaf.ro/test/ETRANSPORT/ws/v1/upload/{val1}/{val2}
+unde:
+-
+
+val1 – valoare de tip String – “ETRANSPORT”
+val2 – CIF
+
+https://api.anaf.ro/test/ETRANSPORT/ws/v1/stareMesaj/{val1}
+unde:
+- val1 – id_incarcare (cod unic de identificare de tip
+numeric. Se obține din lista de răspunsuri furnizată de api Upload)
+https://api.anaf.ro/test/ETRANSPORT/ws/v1/lista/{val1}/{val2}
+unde:
+-
+
+val1 – zile (valorile acceptate sunt între 1 si 60)
+val2 – CIF
+
+https://api.anaf.ro/test/ETRANSPORT/ws/v1/descarcare/{val1}
+
+30
+
+unde:
+- val1 – id (cod unic de identificare de tip numeric. Se
+obține din lista de răspunsuri furnizată de api Lista)
+Mediul de producție:
+Pentru detalii tehnice, accesaţi pagina:
+https://mfinante.gov.ro/ro/web/etransport/informatii-tehnice
+
+Serviciul web de test “TestOauth”
+De asemenea, pentru verificarea aplicației dezvoltată puteți folosi un serviciu de
+test „TestOauth” pus la dispoziție în acest sens:
+https://api.anaf.ro/TestOauth/jaxrs/hello?name=valoare
+https://api.anaf.ro/TestOauth/jaxrs/hello?name=”Test Hello App!”
+Acesta returnează cu titlu de exemplu, valorile de mai jos:
+Hello, "Test Hello App!"
+headers=key=Accept
+val=[*/*]
+key=Accept-Encoding
+val=[gzip, deflate, br]
+key=Authorization
+val=[Bearer 97…………………3]
+key=Cache-Control
+val=[no-cache]
+key=Connection
+val=[keep-alive]
+key=Host
+val=[api.anaf.ro]
+key=issuer
+val=[Anaf]
+key=Postman-Token
+val=[…………………….]
+key=serial_certificate
+
+31
+
+val=[……………………………………]
+key=session-id
+val=[………………….]
+key=session-key
+val=[……………………………………….]
+key=User-Agent
+
+32
+
+ALTE INFORMATII TEHNICE
+Perioada de valabilitate a parametrilor utilizati
+TOKEN:
+– 60 de secunde interval de obținere a unui token valid. După 60 de secunde se
+resetează conexiunea.
+ACCES TOKEN JWT: 129600 minute = 90 zile.
+REFRESH TOKEN JWT: 525600 minute = 365 zile
+
+Mesajele care se pot obtine la apelul serviciilor web
+
+– Status code 403 Forbidden – reprezintă un request neautorizat la URL-urile
+aferente serviciului web de factură.
+– 200 OK – reprezintă faptul că autentificarea și autorizarea s-au realizat cu succes,
+iar serviciul web va returna mesajele aferente de succes sau de eroare în funcție
+de request-urile care se fac, drepturile certificatului, cui-urile pe care le
+reprezintă certificatul, informațiile cerute, informațiile încărcate.
+– 429 Too Many Requests – reprezintă codul de eroare care apare în momentul în
+care se depășește limita maximă de apeluri. Limita este setata la 1000 de apeluri
+pe minut.
+
+Limite accesari api.anaf.ro
+-
+
+1000 Requests pe 1 minut
+
+Limitele se pot defini si ajusta pe viitor, independent, pentru fiecare serviciu in parte.
+
+33
+
+ASISTENTA TEHNICA
+Pentru asistență tehnică, vă rugăm să folosiți Formularul de contact, alegând
+categoria ”Asistență tehnică servicii informatice”, subcategoria ”OAUTH”.
+
+34
+
+

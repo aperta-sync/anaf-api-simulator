@@ -74,7 +74,7 @@ describe('AnafMockServer (e2e)', () => {
     await app.close();
   });
 
-  it('issues oauth token with one-hour expiry for a registered application', async () => {
+  it('issues oauth token with the ANAF 90 day expiry for a registered application', async () => {
     const authCode = await issueAuthorizationCode(
       mockAppCredentials.redirectUri,
     );
@@ -92,7 +92,8 @@ describe('AnafMockServer (e2e)', () => {
       .expect(200);
 
     expect(response.body.token_type).toBe('Bearer');
-    expect(response.body.expires_in).toBe(3600);
+    // ANAF issues access tokens for 90 days ("ACCES TOKEN JWT: 129600 minute = 90 zile").
+    expect(response.body.expires_in).toBe(7776000);
     expect(typeof response.body.access_token).toBe('string');
     expect(typeof response.body.refresh_token).toBe('string');
     expect(String(response.body.access_token).split('.')).toHaveLength(3);

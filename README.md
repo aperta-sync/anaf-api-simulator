@@ -195,6 +195,35 @@ The server behavior is controlled by environment variables. These can be set in 
 | `ANAF_MOCK_STRICT_VAT`       | `false` | When enabled, only explicitly seeded companies are found.                  |
 | `ANAF_MOCK_AUTO_TRAFFIC`     | `false` | Automatically generates random invoices every minute.                      |
 
+### OAuth Token Settings
+
+Defaults match the lifetimes ANAF publishes in *Procedura de înregistrare aplicații
+portal ANAF* — *"ACCES TOKEN JWT: 129600 minute = 90 zile. REFRESH TOKEN JWT: 525600
+minute = 365 zile"*.
+
+| Variable                              | Default            | Description                                                                      |
+| :------------------------------------ | :----------------- | :------------------------------------------------------------------------------- |
+| `ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS`  | `7776000` (90 d)   | Access token lifetime, reported as `expires_in`.                                  |
+| `ANAF_MOCK_REFRESH_TOKEN_TTL_SECONDS` | `31536000` (365 d) | Refresh token lifetime, tracked independently of the access token.                |
+| `ANAF_MOCK_REFRESH_TOKEN_ROTATION`    | `reset`            | `reset` restarts refresh expiry on rotation; `inherit` pins it to the first grant. |
+
+The refresh token outlives the access token, mirroring ANAF: once the access token
+expires, `grant_type=refresh_token` keeps working for the remainder of the refresh
+window.
+
+**Testing expiry.** The real 90-day access lifetime means token expiry will never fire
+during a normal test run. Shorten the TTLs to exercise it:
+
+```bash
+ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS=30 ANAF_MOCK_REFRESH_TOKEN_TTL_SECONDS=120 npm start
+```
+
+**Testing forced re-authentication.** ANAF returns a new refresh token on every refresh,
+so the default `reset` keeps an actively-refreshing client alive indefinitely. Set
+`ANAF_MOCK_REFRESH_TOKEN_ROTATION=inherit` to pin the deadline to the original
+authorization instead, so a long-running refresh loop is eventually cut off and must
+re-authenticate with the certificate.
+
 ### Redis Settings (Required if store is `redis`)
 
 | Variable     | Default     | Description                                                  |
