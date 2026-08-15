@@ -71,10 +71,11 @@ grant_type=refresh_token&refresh_token=<refresh_token>&client_id=...&client_secr
 
 ### Token lifetimes
 
-| Token           | ANAF validity | Seconds    | Simulator default |
-| :-------------- | :------------ | :--------- | :---------------- |
-| `access_token`  | 90 days       | `7776000`  | matches ANAF      |
-| `refresh_token` | 365 days      | `31536000` | matches ANAF      |
+| Token                | ANAF validity | Seconds    | Simulator default      |
+| :------------------- | :------------ | :--------- | :--------------------- |
+| `access_token`       | 90 days       | `7776000`  | matches ANAF           |
+| `refresh_token`      | 365 days      | `31536000` | matches ANAF           |
+| `code` (authz. code) | **unpublished** | —        | `300` (5 min), unsourced |
 
 **Primary source:** ANAF, *Procedura de înregistrare aplicații portal ANAF*
 ([static.anaf.ro](https://static.anaf.ro/static/10/Anaf/Informatii_R/API/Oauth_procedura_inregistrare_aplicatii_portal_ANAF.pdf)),
@@ -89,8 +90,16 @@ And under *Perioada de valabilitate a parametrilor utilizati*:
 > *"ACCES TOKEN JWT: 129600 minute = 90 zile."*
 > *"REFRESH TOKEN JWT: 525600 minute = 365 zile"*
 
-The same section also documents a **60 second** window for obtaining a valid token
-(*"60 de secunde interval de obținere a unui token valid"*).
+**Authorization code lifetime is not published.** The same section documents a
+**60 second** window — *"60 de secunde interval de obținere a unui token valid. După
+60 de secunde se resetează conexiunea"* — but it is listed under `TOKEN:`, separately
+from `ACCES TOKEN JWT`, and *"se resetează conexiunea"* describes a **connection**
+reset. That may bound the code exchange, or may be an unrelated connection timeout;
+no ANAF document or integrator write-up states the code's actual lifetime. The
+simulator keeps a 5 minute default, configurable via
+`ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS`, until the semantics are confirmed against
+a live authorization flow. Tracked in
+[issue #12](https://github.com/aperta-sync/anaf-api-simulator/issues/12).
 
 **Rotation.** The refresh call returns *"valorile noi pentru access_token și în
 refresh_token"* — a new refresh token JWT, itself issued for 365 days. The simulator

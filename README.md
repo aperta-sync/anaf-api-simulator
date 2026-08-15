@@ -206,10 +206,20 @@ minute = 365 zile"*.
 | `ANAF_MOCK_ACCESS_TOKEN_TTL_SECONDS`  | `7776000` (90 d)   | Access token lifetime, reported as `expires_in`.                                  |
 | `ANAF_MOCK_REFRESH_TOKEN_TTL_SECONDS` | `31536000` (365 d) | Refresh token lifetime, tracked independently of the access token.                |
 | `ANAF_MOCK_REFRESH_TOKEN_ROTATION`    | `reset`            | `reset` restarts refresh expiry on rotation; `inherit` pins it to the first grant. |
+| `ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS` | `300` (5 min) | Authorization code lifetime. Not an ANAF-published value — see the note below. |
 
 The refresh token outlives the access token, mirroring ANAF: once the access token
 expires, `grant_type=refresh_token` keeps working for the remainder of the refresh
 window.
+
+> **Authorization code TTL is not ANAF-sourced.** Unlike the token lifetimes above,
+> ANAF does not publish how long an authorization code stays valid. Its registration
+> procedure mentions a 60 second window under *Perioada de valabilitate a parametrilor
+> utilizati*, but the wording (*"se resetează conexiunea"*) may describe a connection
+> reset rather than the code exchange window. The simulator keeps its long-standing
+> 5 minute default until that is confirmed against a live flow. Set
+> `ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS=60` to test against the stricter reading.
+> Tracked in [issue #12](https://github.com/aperta-sync/anaf-api-simulator/issues/12).
 
 **Testing expiry.** The real 90-day access lifetime means token expiry will never fire
 during a normal test run. Shorten the TTLs to exercise it:
