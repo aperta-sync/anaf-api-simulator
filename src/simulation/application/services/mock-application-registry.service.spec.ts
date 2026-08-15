@@ -12,6 +12,7 @@ const ENV_KEYS = [
   'ANAF_CLIENT_ID',
   'ANAF_CLIENT_SECRET',
   'ANAF_CALLBACK_URL',
+  'ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS',
 ] as const;
 
 const originalEnv = new Map<string, string | undefined>();
@@ -153,6 +154,104 @@ describe('MockApplicationRegistryService', () => {
         freshCode,
         app.clientId,
         'https://wrong',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('keeps an authorization code valid until the default five minute TTL elapses', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    const service = new MockApplicationRegistryService();
+    const app = service.registerApplication('OAuth App', [
+      'https://client/callback',
+    ]);
+
+    nowSpy.mockReturnValue(1_000);
+    const code = service.issueAuthorizationCode(
+      app.clientId,
+      'https://client/callback',
+      'id_ion_popescu',
+    );
+
+    nowSpy.mockReturnValue(1_000 + 5 * 60 * 1_000 - 1);
+    expect(
+      service.consumeAuthorizationCode(
+        code,
+        app.clientId,
+        'https://client/callback',
+      ),
+    ).toBeDefined();
+  });
+
+  it('rejects an authorization code once the default five minute TTL elapses', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    const service = new MockApplicationRegistryService();
+    const app = service.registerApplication('OAuth App', [
+      'https://client/callback',
+    ]);
+
+    nowSpy.mockReturnValue(1_000);
+    const code = service.issueAuthorizationCode(
+      app.clientId,
+      'https://client/callback',
+      'id_ion_popescu',
+    );
+
+    nowSpy.mockReturnValue(1_000 + 5 * 60 * 1_000 + 1);
+    expect(
+      service.consumeAuthorizationCode(
+        code,
+        app.clientId,
+        'https://client/callback',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('falls back to the default TTL when the configured value is not a positive number', () => {
+    process.env.ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS = 'not-a-number';
+    const nowSpy = jest.spyOn(Date, 'now');
+    const service = new MockApplicationRegistryService();
+    const app = service.registerApplication('OAuth App', [
+      'https://client/callback',
+    ]);
+
+    nowSpy.mockReturnValue(1_000);
+    const code = service.issueAuthorizationCode(
+      app.clientId,
+      'https://client/callback',
+      'id_ion_popescu',
+    );
+
+    nowSpy.mockReturnValue(1_000 + 4 * 60 * 1_000);
+    expect(
+      service.consumeAuthorizationCode(
+        code,
+        app.clientId,
+        'https://client/callback',
+      ),
+    ).toBeDefined();
+  });
+
+  it('honours a configured authorization code TTL', () => {
+    process.env.ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS = '60';
+    const nowSpy = jest.spyOn(Date, 'now');
+    const service = new MockApplicationRegistryService();
+    const app = service.registerApplication('OAuth App', [
+      'https://client/callback',
+    ]);
+
+    nowSpy.mockReturnValue(1_000);
+    const code = service.issueAuthorizationCode(
+      app.clientId,
+      'https://client/callback',
+      'id_ion_popescu',
+    );
+
+    nowSpy.mockReturnValue(1_000 + 61 * 1_000);
+    expect(
+      service.consumeAuthorizationCode(
+        code,
+        app.clientId,
+        'https://client/callback',
       ),
     ).toBeUndefined();
   });

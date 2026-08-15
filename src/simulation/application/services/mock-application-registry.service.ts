@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { SimulationTypes } from '../../domain/simulation.types';
 import { RedisControlStateStoreService } from '../../infrastructure/persistence/redis-control-state-store.service';
+import { readTtlSeconds } from './ttl-config';
 
 interface AuthorizationCodeGrant {
   code: string;
@@ -16,6 +17,22 @@ export interface ConsumedAuthorizationCodeGrant {
   redirectUri: string;
   identityId: string;
 }
+
+/**
+ * Authorization code lifetime, matching ANAF's inferred F5 BIG-IP APM configuration.
+ *
+ * ANAF's OAuth server is F5 BIG-IP APM: its OIDC discovery document at
+ * logincert.anaf.ro serves revoke, introspect and userinfo from /f5-oauth2/v1/ paths.
+ * F5 expresses OAuth lifetimes in minutes, and the values ANAF publishes are quoted in
+ * exactly those units — "ACCES TOKEN JWT: 129600 minute", "REFRESH TOKEN JWT: 525600
+ * minute" — i.e. its overridden jwt-access-token-lifetime and jwt-refresh-token-lifetime.
+ * auth-code-lifetime is absent from that list, indicating it is left at the F5 default
+ * of 5 minutes, which is what this value mirrors.
+ *
+ * The separate "60 de secunde" entry in the same section describes a connection reset
+ * during token acquisition, not the code exchange window. See issue #12.
+ */
+const DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS = 5 * 60;
 
 /**
  * Stores mock OAuth applications and short-lived authorization codes.
@@ -33,6 +50,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
     string,
     AuthorizationCodeGrant
   >();
+  private readonly authorizationCodeTtlSeconds: number;
 
   /**
    * Seeds an environment-defined OAuth client at startup when configured.
@@ -51,6 +69,10 @@ export class MockApplicationRegistryService implements OnModuleInit {
     private readonly controlStateStore?: RedisControlStateStoreService,
   ) {
     // Nest manages lifecycle for injected services.
+    this.authorizationCodeTtlSeconds = readTtlSeconds(
+      process.env.ANAF_MOCK_AUTHORIZATION_CODE_TTL_SECONDS,
+      DEFAULT_AUTHORIZATION_CODE_TTL_SECONDS,
+    );
   }
 
   /**
@@ -286,7 +308,7 @@ export class MockApplicationRegistryService implements OnModuleInit {
       clientId: clientId.trim(),
       redirectUri: redirectUri.trim(),
       identityId: identityId.trim(),
-      expiresAt: Date.now() + 5 * 60 * 1000,
+      expiresAt: Date.now() + this.authorizationCodeTtlSeconds * 1000,
     };
 
     this.authorizationCodes.set(code, grant);
